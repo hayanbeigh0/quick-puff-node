@@ -36,7 +36,7 @@ const addDeliveryAddressLocations = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     data: {
-      user: updatedUser,
+      deliveryAddressLocations: updatedUser.deliveryAddressLocations,
     },
   });
 });
@@ -69,7 +69,7 @@ const removeDeliveryAddressLocation = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     data: {
-      user: updatedUser,
+      deliveryAddressLocations: user.deliveryAddressLocations,
     },
   });
 });
