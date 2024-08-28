@@ -1,7 +1,48 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 
-const userSchema = mongoose.Schema(
+const deliveryAddressLocationSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+    },
+    type: {
+      type: String,
+      default: 'Point',
+      enum: ['Point'],
+    },
+    coordinates: {
+      type: [Number],
+    },
+    floor: String,
+    appartment: String,
+    addressDetails: String,
+    addressPhoneNumber: String,
+    description: String,
+  },
+  {
+    _id: true, // Ensure _id is created for each subdocument
+    id: true, // Create a virtual 'id' field from '_id'
+    toJSON: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+      },
+    },
+  },
+);
+
+// Define the user schema
+const userSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
@@ -37,6 +78,7 @@ const userSchema = mongoose.Schema(
       type: String,
       trim: true,
     },
+    deliveryAddressLocations: [deliveryAddressLocationSchema], // Use the subdocument schema
     active: { type: Boolean, default: true, select: false },
   },
   {
@@ -68,13 +110,10 @@ userSchema.pre(/^find/, async function (next) {
 });
 
 userSchema.pre('save', function (next) {
-  console.log('logging the user')
   if (this.firstName && this.lastName && this.phoneNumber && this.dateOfBirth) {
-    console.log('setting true')
     this.profileCompleted = true;
     return next();
   }
-  console.log('setting false')
 
   this.profileCompleted = false;
   next();
