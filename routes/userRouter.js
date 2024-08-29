@@ -15,4 +15,11 @@ router
   .route('/myDeliveryAddressLocations/:deliveryLocationId')
   .delete(authController.protect, userController.removeDeliveryAddressLocation);
 
+router
+  .route('/setDefaultDeliveryAddressLocation/:deliveryLocationId')
+  .post(
+    authController.protect,
+    userController.setDefaultDeliveryAddressLocations,
+  );
+
 module.exports = router;

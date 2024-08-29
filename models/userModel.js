@@ -20,6 +20,11 @@ const deliveryAddressLocationSchema = new mongoose.Schema(
     addressDetails: String,
     addressPhoneNumber: String,
     description: String,
+    default: {
+      type: Boolean,
+      default: false,
+      required: [true, 'A User must have a default delivery address'],
+    },
   },
   {
     _id: true, // Ensure _id is created for each subdocument

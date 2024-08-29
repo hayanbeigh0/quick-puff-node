@@ -89,9 +89,43 @@ const getDeliveryAddressLocations = catchAsync(async (req, res, next) => {
   });
 });
 
+const setDefaultDeliveryAddressLocations = catchAsync(
+  async (req, res, next) => {
+    const user = await User.findByIdAndUpdate(req.user._id);
+
+    if (!user) return next(new AppError('No user found with that id', 400));
+
+    const { deliveryLocationId } = req.params;
+
+    // Find the address location with the matching ID
+    const addressToUpdate = user.deliveryAddressLocations.find(
+      (location) => location._id.toString() === deliveryLocationId,
+    );
+
+    if (!addressToUpdate) {
+      return next(new AppError('Delivery address location not found', 404));
+    }
+
+    // Set default to true for the selected address and false for others
+    user.deliveryAddressLocations.forEach((location) => {
+      location.default = location._id.toString() === deliveryLocationId;
+    });
+
+    await user.save();
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        deliveryAddressLocations: user.deliveryAddressLocations,
+      },
+    });
+  },
+);
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
   getDeliveryAddressLocations,
   removeDeliveryAddressLocation,
+  setDefaultDeliveryAddressLocations,
 };
