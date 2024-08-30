@@ -7,6 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const { sendEmail, loginCodeMailgenContent } = require('../utils/email');
 const crypto = require('crypto');
 const appleSigninAuth = require('apple-signin-auth');
+const ErrorCodes = require('../utils/appErrorCodes');
 
 const createAndSendToken = (user, statusCode, res) => {
   const token = signToken(user._id);
@@ -43,7 +44,13 @@ exports.googleSignIn = catchAsync(async (req, res, next) => {
   const { idToken } = req.body;
 
   if (!idToken) {
-    return next(new AppError('No Google ID token provided!', 400));
+    return next(
+      new AppError(
+        'No Google ID token provided!',
+        400,
+        ErrorCodes.NO_GOOGLE_ID_TOKEN_PROVIDED.code,
+      ),
+    );
   }
 
   // 1) Verify the ID token
@@ -55,7 +62,9 @@ exports.googleSignIn = catchAsync(async (req, res, next) => {
     });
     payload = ticket.getPayload();
   } catch (error) {
-    return next(new AppError('Invalid Google token!', 401));
+    return next(
+      new AppError('Invalid Google token!', 401, ErrorCodes.INVALID_GOOGLE_ID.code),
+    );
   }
   console.log(payload);
 
@@ -86,7 +95,13 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
   const { idToken, email, fullName } = req.body;
 
   if (!idToken) {
-    return next(new AppError('No Apple ID token provided!', 400));
+    return next(
+      new AppError(
+        'No Apple ID token provided!',
+        400,
+        ErrorCodes.NO_APPLE_ID_TOKEN_PROVIDED.code,
+      ),
+    );
   }
 
   let appleUser;
@@ -96,7 +111,9 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
       ignoreExpiration: false,
     });
   } catch (error) {
-    return next(new AppError('Invalid Apple token!', 401));
+    return next(
+      new AppError('Invalid Apple token!', 401, ErrorCodes.INVALID_APPLE_ID.code),
+    );
   }
 
   const { sub: appleId } = appleUser;
@@ -121,7 +138,9 @@ exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
   const { email, name } = req.body;
 
   if (!email) {
-    return next(new AppError('No email provided!', 400));
+    return next(
+      new AppError('No email provided!', 400, ErrorCodes.NO_EMAIL_PROVIDED.code),
+    );
   }
 
   // Check if the user already exists
@@ -166,6 +185,7 @@ exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
       new AppError(
         'There was an error sending an email. Try again later!',
         500,
+        ErrorCodes.EMAIL_SENDING_ERROR.code,
       ),
     );
   }
@@ -182,7 +202,13 @@ exports.verifyAuthCode = catchAsync(async (req, res, next) => {
   });
 
   if (!user) {
-    return next(new AppError('Invalid or expired verification code!', 400));
+    return next(
+      new AppError(
+        'Invalid or expired verification code!',
+        400,
+        ErrorCodes.INVALID_OR_EXPIRED_VERIFICATION_CODE.code,
+      ),
+    );
   }
 
   const candidateHashCode = crypto
@@ -192,7 +218,13 @@ exports.verifyAuthCode = catchAsync(async (req, res, next) => {
 
   // Compare candidate hash code with hash store in db
   if (candidateHashCode !== user.verificationCode)
-    return next(new AppError('Invalid verification code', 401));
+    return next(
+      new AppError(
+        'Invalid verification code',
+        401,
+        ErrorCodes.INVALID_VERIFICATION_CODE.code,
+      ),
+    );
 
   // Clear the verification code and expiration
   user.verificationCode = undefined;
@@ -214,7 +246,11 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
   if (!token) {
     next(
-      new AppError('You are not logged in! Please login to get access.', 401),
+      new AppError(
+        'You are not logged in! Please login to get access.',
+        401,
+        ErrorCodes.NOT_LOGGED_IN.code,
+      ),
     );
   }
   // 2) Check if the token is valid.
@@ -223,7 +259,11 @@ exports.protect = catchAsync(async (req, res, next) => {
   const currentUser = await User.findById(decoded.id);
   if (!currentUser) {
     return next(
-      new AppError('The user belonging to the token does not exist!', 401),
+      new AppError(
+        'The user belonging to the token does not exist!',
+        401,
+        ErrorCodes.NO_USER_BELONGING_TO_TOKEN.code,
+      ),
     );
   }
   // // 4) Check if user changed password after the token was generated
