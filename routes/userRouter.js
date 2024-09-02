@@ -13,7 +13,8 @@ router
 
 router
   .route('/myDeliveryAddressLocations/:deliveryLocationId')
-  .delete(authController.protect, userController.removeDeliveryAddressLocation);
+  .delete(authController.protect, userController.removeDeliveryAddressLocation)
+  .patch(authController.protect, userController.updateDeliveryAddressLocation);
 
 router
   .route('/setDefaultDeliveryAddressLocation/:deliveryLocationId')

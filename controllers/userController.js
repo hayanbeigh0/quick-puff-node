@@ -122,10 +122,44 @@ const setDefaultDeliveryAddressLocations = catchAsync(
   },
 );
 
+const updateDeliveryAddressLocation = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) return next(new AppError('No user found with that id', 400));
+
+  const deliveryLocationId = req.params.deliveryLocationId;
+  const updatedLocation = req.body;
+
+  if (!deliveryLocationId || !updatedLocation) {
+    return next(new AppError('Location ID and updated data are required', 400));
+  }
+
+  const locationIndex = user.deliveryAddressLocations.findIndex(
+    (location) => location._id.toString() === deliveryLocationId,
+  );
+
+  if (locationIndex === -1) {
+    return next(new AppError('No delivery address found with that ID', 404));
+  }
+
+  // Update the specific fields in the location
+  Object.assign(user.deliveryAddressLocations[locationIndex], updatedLocation);
+
+  const updatedUser = await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      deliveryAddressLocations: updatedUser.deliveryAddressLocations,
+    },
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
   getDeliveryAddressLocations,
   removeDeliveryAddressLocation,
   setDefaultDeliveryAddressLocations,
+  updateDeliveryAddressLocation,
 };
