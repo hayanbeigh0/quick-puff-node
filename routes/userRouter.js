@@ -9,12 +9,12 @@ router.route('/').patch(authController.protect, userController.updateProfile);
 router
   .route('/myDeliveryAddressLocations')
   .post(authController.protect, userController.addDeliveryAddressLocations)
-  .get(authController.protect, userController.getDeliveryAddressLocations);
+  .get(authController.protect, userController.getDeliveryAddressLocations)
+  .patch(authController.protect, userController.updateDeliveryAddressLocation);
 
 router
   .route('/myDeliveryAddressLocations/:deliveryLocationId')
-  .delete(authController.protect, userController.removeDeliveryAddressLocation)
-  .patch(authController.protect, userController.updateDeliveryAddressLocation);
+  .delete(authController.protect, userController.removeDeliveryAddressLocation);
 
 router
   .route('/setDefaultDeliveryAddressLocation/:deliveryLocationId')

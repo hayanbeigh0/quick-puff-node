@@ -2,6 +2,14 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
 
+const cloudinary = require('cloudinary').v2;
+
+// Return "https" URLs by setting secure: true
+cloudinary.config({
+  secure: true,
+});
+console.log(cloudinary.config());
+
 const DB = process.env.DATABASE.replace(
   '<PASSWORD>',
   process.env.DATABASE_PASSWORD,

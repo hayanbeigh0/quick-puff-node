@@ -127,15 +127,14 @@ const updateDeliveryAddressLocation = catchAsync(async (req, res, next) => {
 
   if (!user) return next(new AppError('No user found with that id', 400));
 
-  const deliveryLocationId = req.params.deliveryLocationId;
   const updatedLocation = req.body;
 
-  if (!deliveryLocationId || !updatedLocation) {
+  if (!updatedLocation || !updatedLocation.id) {
     return next(new AppError('Location ID and updated data are required', 400));
   }
 
   const locationIndex = user.deliveryAddressLocations.findIndex(
-    (location) => location._id.toString() === deliveryLocationId,
+    (location) => location._id.toString() === updatedLocation.id,
   );
 
   if (locationIndex === -1) {
