@@ -24,7 +24,15 @@ const homePageData = catchAsync(async (req, res, next) => {
 
   if (!productCategories) {
     // Fetch from database if not in cache
-    productCategories = await ProductCategory.find().select('name image _id');
+    productCategories = await ProductCategory.find()
+      .select('name image _id')
+      .lean();
+    // Rename _id to id
+    productCategories = productCategories.map((category) => ({
+      ...category,
+      id: category._id,
+      _id: undefined, // Remove the _id field
+    }));
     // Store data in cache
     productCategoryCache.set('productCategories', productCategories);
   }
@@ -60,7 +68,14 @@ const homePageData = catchAsync(async (req, res, next) => {
       },
     },
     {
+      $addFields: {
+        id: '$_id', // Add a new field `id` with the value of `_id`
+      },
+    },
+    {
       $project: {
+        _id: 0, // Exclude `_id` from the result
+        id: 1, // Include `id` in the result
         brandCategoryName: '$name',
         brands: {
           name: 1,
