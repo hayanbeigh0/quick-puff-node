@@ -24,6 +24,9 @@ const createProduct = catchAsync(async (req, res, next) => {
     price: req.body.price,
     oldPrice: req.body.oldPrice,
     stock: req.body.stock,
+    puff: req.body.puff,
+    productCategory: req.body.productCategory,
+    brand: req.body.brand,
   });
 
   res.status(201).json({
@@ -68,6 +71,9 @@ const updateProduct = catchAsync(async (req, res, next) => {
       price: req.body.price || product.price,
       oldPrice: req.body.oldPrice || product.oldPrice,
       stock: req.body.stock || product.stock,
+      puff: req.body.puff || product.puff,
+      productCategory: req.body.productCategory || product.productCategory,
+      brand: req.body.brand || product.brand,
     },
     {
       new: true, // Return the updated document

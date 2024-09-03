@@ -31,14 +31,21 @@ const productSchema = new mongoose.Schema(
       default: Infinity,
       required: true,
     },
+    puff: {
+      type: Number,
+      min: 0,
+      max: Infinity,
+      default: Infinity,
+      required: true,
+    },
     productCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ProductCategory',
       required: true,
     },
-    brandCategory: {
+    brand: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'BrandCategory',
+      ref: 'Brand',
     },
   },
   {
