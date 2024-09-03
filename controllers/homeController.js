@@ -63,6 +63,16 @@ const homePageData = catchAsync(async (req, res, next) => {
               image: 1,
             },
           },
+          {
+            $addFields: {
+              id: '$_id', // Add a new field `id` with the value of `_id`
+            },
+          },
+          {
+            $project: {
+              _id: 0, // Exclude `_id` from the result
+            },
+          },
         ],
         as: 'brandCategoryProducts',
       },
