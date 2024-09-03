@@ -6,6 +6,7 @@ const productRouter = require('./productRouter');
 const serviceableLocationRouter = require('./serviceableLocationRouter');
 const productCategoryRouter = require('./productCategoryRouter');
 const brandCategoryRouter = require('./brandCategoryRouter');
+const brandRouter = require('./brandRouter');
 
 const router = express.Router();
 
@@ -15,5 +16,6 @@ router.use('/product', productRouter);
 router.use('/serviceableLocation', serviceableLocationRouter);
 router.use('/productCategory', productCategoryRouter);
 router.use('/brandCategory', brandCategoryRouter);
+router.use('/brand', brandRouter);
 
 module.exports = router;
