@@ -16,7 +16,7 @@ router
   .get(authController.protect, productController.getProducts)
   .patch(
     authController.protect,
-    productController.uploadMiddleware,
+    fileUploadController.handleFileUpload,
     productController.updateProduct,
   );
 router

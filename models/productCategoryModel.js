@@ -14,6 +14,8 @@ const productCategorySchema = new mongoose.Schema({
   description: String,
 });
 
+productCategorySchema.index({ name: 1 });
+
 const ProductCategory = mongoose.model(
   'ProductCategory',
   productCategorySchema,
