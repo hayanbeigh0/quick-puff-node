@@ -1,42 +1,65 @@
 const mongoose = require('mongoose');
 
-const productSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
+const productSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    image: {
+      type: String,
+    },
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    price: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    oldPrice: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    stock: {
+      type: Number,
+      min: 0,
+      max: Infinity,
+      default: Infinity,
+      required: true,
+    },
+    productCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductCategory',
+      required: true,
+    },
+    brandCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BrandCategory',
+    },
   },
-  image: {
-    type: String,
+  {
+    _id: true, // Ensure _id is created for each subdocument
+    id: true, // Create a virtual 'id' field from '_id'
+    toJSON: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+      },
+    },
   },
-  description: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  price: {
-    type: Number,
-    min: 0,
-    required: true,
-  },
-  oldPrice: {
-    type: Number,
-    min: 0,
-    required: true,
-  },
-  stock: {
-    type: Number,
-    min: 0,
-    max: Infinity,
-    default: Infinity,
-    required: true,
-  },
-  productCategory: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ProductCategory',
-    required: true,
-  },
-  brandCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'BrandCategory' },
-});
+);
 
 productSchema.index({ category: 1 });
 productSchema.index({ brand: 1 });
