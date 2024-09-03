@@ -1,10 +1,7 @@
 const APIFeatures = require('../utils/apiFeatures');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
-const User = require('../models/userModel');
-const mongoose = require('mongoose');
 const setTransaction = require('./transactionController');
-const helpers = require('../utils/helper');
 
 exports.fn = function () {
   console.log('this is the export functionx');

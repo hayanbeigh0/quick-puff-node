@@ -30,7 +30,16 @@ const productSchema = new mongoose.Schema({
     default: Infinity,
     required: true,
   },
+  productCategory: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ProductCategory',
+    required: true,
+  },
+  brandCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'BrandCategory' },
 });
+
+productSchema.index({ category: 1 });
+productSchema.index({ brand: 1 });
 
 const Product = mongoose.model('Product', productSchema);
 
