@@ -1,41 +1,52 @@
 const BrandCategory = require('../models/brandCategoryModel');
-const Brand = require('../models/brandModel');
 const ProductCategory = require('../models/productCategoryModel');
-const Product = require('../models/productModel');
 const AppError = require('../utils/appError');
-const factory = require('./handlerFactory');
-const mongoose = require('mongoose');
 const catchAsync = require('../utils/catchAsync');
+const NodeCache = require('node-cache');
+const productCategoryCache = new NodeCache({ stdTTL: 3600 });
 
 /**
  * Controller function to fetch and structure homepage data using an aggregation pipeline.
  * The data includes product categories, brand categories, brands, and products.
  */
 const homePageData = catchAsync(async (req, res, next) => {
-  // 1. Fetch the product categories
-  const productCategories =
-    await ProductCategory.find().select('name image _id');
+  // Extract pagination parameters from query string
+  const page = parseInt(req.query.page, 10) || 1; // Default to page 1
+  const limit = parseInt(req.query.limit, 10) || 10; // Default to 10 items per page
 
-  // 2. Use aggregation pipeline to fetch brand categories, brands, and products in a single query
+  // Ensure page and limit are positive integers
+  if (page < 1 || limit < 1) {
+    return next(new AppError('Page and limit must be positive integers', 400));
+  }
+
+  // Check if data is in cache
+  let productCategories = productCategoryCache.get('productCategories');
+
+  if (!productCategories) {
+    // Fetch from database if not in cache
+    productCategories = await ProductCategory.find().select('name image _id');
+    // Store data in cache
+    productCategoryCache.set('productCategories', productCategories);
+  }
+
+  // 2. Use aggregation pipeline to fetch brand categories, brands, and products with pagination
   const brandsData = await BrandCategory.aggregate([
-    // Lookup brands that are associated with each brand category
     {
       $lookup: {
-        from: 'brands', // The name of the collection for Brand
-        localField: '_id', // The _id field in BrandCategory
-        foreignField: 'categories', // The categories field in Brand
-        as: 'brands', // The name of the output array
+        from: 'brands',
+        localField: '_id',
+        foreignField: 'categories',
+        as: 'brands',
       },
     },
-    // Lookup products that are associated with each product category under the brand category
     {
       $lookup: {
-        from: 'products', // The name of the collection for Product
-        let: { productCategoryIds: '$productCategories' }, // Pass the productCategories _id
+        from: 'products',
+        let: { productCategoryIds: '$productCategories' },
         pipeline: [
           {
             $match: {
-              $expr: { $in: ['$productCategory', '$$productCategoryIds'] }, // Match products by productCategory
+              $expr: { $in: ['$productCategory', '$$productCategoryIds'] },
             },
           },
           {
@@ -45,30 +56,44 @@ const homePageData = catchAsync(async (req, res, next) => {
             },
           },
         ],
-        as: 'brandCategoryProducts', // The name of the output array
+        as: 'brandCategoryProducts',
       },
     },
-    // Project only the required fields
     {
       $project: {
-        brandCategoryName: '$name', // Rename 'name' to 'brandCategoryName'
+        brandCategoryName: '$name',
         brands: {
           name: 1,
           image: 1,
         },
-        brandCategoryProducts: 1, // Include the products
+        brandCategoryProducts: 1,
       },
+    },
+    {
+      $skip: (page - 1) * limit, // Skip the documents for the current page
+    },
+    {
+      $limit: limit, // Limit the number of documents per page
     },
   ]);
 
-  // 3. Create the final response structure
+  // 3. Get the total count of brand categories
+  const totalBrandCategories = await BrandCategory.countDocuments();
+
+  // 4. Create the final response structure
   const response = {
     status: 'success',
-    productCategories: productCategories,
+    productCategories,
     brandsAndProducts: brandsData,
+    pageInfo: {
+      page,
+      limit,
+      totalPages: Math.ceil(totalBrandCategories / limit),
+      totalItems: totalBrandCategories,
+    },
   };
 
-  // 4. Send the response back to the client
+  // 5. Send the response back to the client
   res.status(200).json(response);
 });
 

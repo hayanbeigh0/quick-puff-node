@@ -68,7 +68,7 @@ const productSchema = new mongoose.Schema(
   },
 );
 
-productSchema.index({ category: 1 });
+productSchema.index({ productCategory: 1 });
 productSchema.index({ brand: 1 });
 
 const Product = mongoose.model('Product', productSchema);

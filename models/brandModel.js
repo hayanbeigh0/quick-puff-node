@@ -38,6 +38,8 @@ const brandSchema = new mongoose.Schema(
   },
 );
 
+brandSchema.index({ categories: 1 });
+
 const Brand = mongoose.model('Brand', brandSchema);
 
 module.exports = Brand;
