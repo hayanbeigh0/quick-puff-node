@@ -8,7 +8,19 @@ const productCategoryCache = new NodeCache({ stdTTL: 3600 });
 /**
  * Controller function to fetch and structure homepage data using an aggregation pipeline.
  * The data includes product categories, brand categories, brands, and products.
+ * Aggregation Pipeline for Brands and Products:
+
+    The pipeline performs the following operations:
+    $lookup for Brands: Joins the brands collection with the BrandCategory based on the category ID. 
+    The pipeline inside the $lookup projects each brand's _id as id and excludes the original _id.
+    $lookup for Products: Joins the products collection with the BrandCategory based on product category IDs.
+     A facet is used to limit the products to 10 and count the total number of products.
+    Remaining Items Calculation: Calculates the number of remaining items by subtracting 10 
+    (the number of products retrieved) from the total product count.
+    $addFields and $project: Fields like id, brandCategoryName, brands, and brandCategoryProducts are added to the 
+    final output, and unnecessary fields like _id are excluded.
  */
+
 const homePageData = catchAsync(async (req, res, next) => {
   // Extract pagination parameters from query string
   const page = parseInt(req.query.page, 10) || 1; // Default to page 1
