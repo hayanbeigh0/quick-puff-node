@@ -5,6 +5,8 @@ const catchAsync = require('../utils/catchAsync');
 const mongoose = require('mongoose');
 const { nodeCacheProvider } = require('../providers/cacheProvider'); // Path to your NodeCache provider
 const createCacheService = require('../services/cacheService'); // Path to your cache service
+const BrandCategory = require('../models/brandCategoryModel');
+const Product = require('../models/productModel');
 
 // Create the cache service instance with the NodeCache provider
 const cacheService = createCacheService(nodeCacheProvider);
@@ -174,6 +176,79 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
   },
 );
 
+/**
+ * Controller function to fetch products based on a brand ID and product category ID, with pagination.
+ */
+const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
+  const { brandId, productCategoryId } = req.params;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 10;
+
+  const products = await Product.aggregate([
+    {
+      $match: {
+        brand: mongoose.Types.ObjectId(brandId),
+        productCategory: mongoose.Types.ObjectId(productCategoryId),
+      },
+    },
+    {
+      $facet: {
+        products: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit }, // Apply pagination
+          {
+            $project: {
+              id: '$_id',
+              name: 1,
+              image: 1,
+              price: 1,
+              puff: 1,
+              _id: 0,
+            },
+          },
+        ],
+        totalCount: [{ $count: 'count' }],
+      },
+    },
+    {
+      $addFields: {
+        remainingItems: {
+          $let: {
+            vars: {
+              totalItems: { $arrayElemAt: ['$totalCount.count', 0] },
+            },
+            in: { $max: [{ $subtract: ['$$totalItems', limit] }, 0] },
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        totalCount: 0,
+      },
+    },
+    {
+      $replaceRoot: {
+        newRoot: {
+          productsByBrandAndCategory: {
+            products: '$products',
+            remainingItems: '$remainingItems',
+          },
+        },
+      },
+    },
+  ]);
+
+  res
+    .status(200)
+    .json(
+      products[0] || {
+        productsByBrandAndCategory: { products: [], remainingItems: 0 },
+      },
+    );
+});
+
 module.exports = {
   getBrandsAndProductsByBrandCategory,
+  getProductsByBrandAndCategory,
 };
