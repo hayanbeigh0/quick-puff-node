@@ -45,6 +45,16 @@ const homePageData = catchAsync(async (req, res, next) => {
         localField: '_id',
         foreignField: 'categories',
         as: 'brands',
+        pipeline: [
+          {
+            $project: {
+              id: '$_id', // Create `id` from `_id`
+              name: 1,
+              image: 1,
+              _id: 0, // Exclude `_id`
+            },
+          },
+        ],
       },
     },
     {
@@ -63,7 +73,7 @@ const homePageData = catchAsync(async (req, res, next) => {
                 { $limit: 10 }, // Fetch only 10 products
                 {
                   $project: {
-                    id: '$_id', // Add a new field `id` with the value of `_id`
+                    id: '$_id', // Create `id` from `_id`
                     name: 1,
                     image: 1,
                     _id: 0, // Exclude `_id`
@@ -96,18 +106,15 @@ const homePageData = catchAsync(async (req, res, next) => {
     },
     {
       $addFields: {
-        id: '$_id', // Add a new field `id` with the value of `_id`
+        id: '$_id', // Create `id` from `_id`
       },
     },
     {
       $project: {
-        _id: 0, // Exclude `_id` from the result
-        id: 1, // Include `id` in the result
+        _id: 0, // Exclude `_id`
+        id: 1, // Include `id`
         brandCategoryName: '$name',
-        brands: {
-          name: 1,
-          image: 1,
-        },
+        brands: 1,
         brandCategoryProducts: 1,
       },
     },
