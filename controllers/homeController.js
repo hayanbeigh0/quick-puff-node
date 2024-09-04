@@ -58,25 +58,36 @@ const homePageData = catchAsync(async (req, res, next) => {
             },
           },
           {
-            $project: {
-              name: 1,
-              image: 1,
+            $facet: {
+              products: [
+                { $limit: 10 }, // Fetch only 10 products
+                {
+                  $project: {
+                    id: '$_id', // Add a new field `id` with the value of `_id`
+                    name: 1,
+                    image: 1,
+                    _id: 0, // Exclude `_id`
+                  },
+                },
+              ],
+              totalCount: [{ $count: 'count' }], // Count total items
             },
           },
           {
-            $group: {
-              _id: null,
-              products: {
-                $push: { id: '$_id', name: '$name', image: '$image' },
+            $addFields: {
+              remainingItems: {
+                $let: {
+                  vars: {
+                    totalItems: { $arrayElemAt: ['$totalCount.count', 0] },
+                  },
+                  in: { $max: [{ $subtract: ['$$totalItems', 10] }, 0] }, // Ensure non-negative remainingItems
+                },
               },
-              totalProducts: { $sum: 1 }, // Count total products
             },
           },
           {
             $project: {
-              _id: 0,
-              products: { $slice: ['$products', 10] }, // Limit products to 10
-              remainingItems: { $subtract: ['$totalProducts', 10] }, // Calculate remaining items
+              totalCount: 0, // Exclude totalCount from the final output
             },
           },
         ],
@@ -97,10 +108,7 @@ const homePageData = catchAsync(async (req, res, next) => {
           name: 1,
           image: 1,
         },
-        brandCategoryProducts: {
-          products: 1,
-          remainingItems: 1,
-        },
+        brandCategoryProducts: 1,
       },
     },
     {
