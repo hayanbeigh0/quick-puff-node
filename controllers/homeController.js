@@ -64,13 +64,19 @@ const homePageData = catchAsync(async (req, res, next) => {
             },
           },
           {
-            $addFields: {
-              id: '$_id', // Add a new field `id` with the value of `_id`
+            $group: {
+              _id: null,
+              products: {
+                $push: { id: '$_id', name: '$name', image: '$image' },
+              },
+              totalProducts: { $sum: 1 }, // Count total products
             },
           },
           {
             $project: {
-              _id: 0, // Exclude `_id` from the result
+              _id: 0,
+              products: { $slice: ['$products', 10] }, // Limit products to 10
+              remainingItems: { $subtract: ['$totalProducts', 10] }, // Calculate remaining items
             },
           },
         ],
@@ -91,7 +97,10 @@ const homePageData = catchAsync(async (req, res, next) => {
           name: 1,
           image: 1,
         },
-        brandCategoryProducts: 1,
+        brandCategoryProducts: {
+          products: 1,
+          remainingItems: 1,
+        },
       },
     },
     {
