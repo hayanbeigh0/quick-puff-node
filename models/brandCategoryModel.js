@@ -33,7 +33,6 @@ const brandCategorySchema = new mongoose.Schema(
 );
 
 brandCategorySchema.index({ name: 1 });
-brandCategorySchema.index({ _id: 1 });
 
 const BrandCategory = mongoose.model('BrandCategory', brandCategorySchema);
 
