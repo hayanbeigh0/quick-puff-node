@@ -5,7 +5,6 @@ const catchAsync = require('../utils/catchAsync');
 const mongoose = require('mongoose');
 const { nodeCacheProvider } = require('../providers/cacheProvider'); // Path to your NodeCache provider
 const createCacheService = require('../services/cacheService'); // Path to your cache service
-const BrandCategory = require('../models/brandCategoryModel');
 const Product = require('../models/productModel');
 
 // Create the cache service instance with the NodeCache provider
@@ -184,18 +183,99 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
   const page = parseInt(req.query.page, 10) || 1;
   const limit = parseInt(req.query.limit, 10) || 10;
 
+  // Extract filters from query params
+  const {
+    sortBy, // Sorting (e.g., "Most Relevant", "Price: Low to High")
+    deals, // Boolean for deals
+    available, // Boolean for availability
+    flavor, // Flavor ObjectId
+    maxPuff, // Maximum puff count
+    nicotineStrength, // Nicotine Strength
+    minPrice, // Minimum Price
+    maxPrice, // Maximum Price
+  } = req.query;
+
+  // Define match filters
+  const matchFilters = {
+    brand: mongoose.Types.ObjectId(brandId),
+    productCategory: mongoose.Types.ObjectId(productCategoryId),
+  };
+
+  // Apply filters based on query parameters
+  if (deals) {
+    matchFilters.oldPrice = { $gt: 0 }; // Assuming deals mean discount (oldPrice exists)
+  }
+
+  if (available) {
+    matchFilters.stock = { $gt: 0 }; // Products with stock greater than 0
+  }
+
+  if (flavor) {
+    matchFilters.flavor = mongoose.Types.ObjectId(flavor);
+  }
+
+  if (maxPuff) {
+    matchFilters.puff = { $lte: parseInt(maxPuff, 10) }; // Puff count should be less than or equal to maxPuff
+  }
+
+  if (nicotineStrength) {
+    matchFilters.nicotineStrength = parseInt(nicotineStrength, 10); // Nicotine strength filter
+  }
+
+  if (minPrice || maxPrice) {
+    matchFilters.price = {};
+    if (minPrice) {
+      matchFilters.price.$gte = parseInt(minPrice, 10); // Minimum price
+    }
+    if (maxPrice) {
+      matchFilters.price.$lte = parseInt(maxPrice, 10); // Maximum price
+    }
+  }
+
+  // Define sorting options
+  const sortOptions = {};
+  switch (sortBy) {
+    case 'popularity':
+      sortOptions.popularityScore = -1;
+      break;
+    case 'price-low-to-high':
+      sortOptions.price = 1;
+      break;
+    case 'price-high-to-low':
+      sortOptions.price = -1;
+      break;
+    case 'new-arrivals':
+      sortOptions.createdAt = -1; // Sort by creation date for new arrivals
+      break;
+    case 'discount':
+      sortOptions.oldPrice = -1; // Assume discount is determined by oldPrice
+      break;
+    default:
+      sortOptions.relevance = -1; // Default sorting (most relevant)
+  }
+
   const products = await Product.aggregate([
     {
-      $match: {
-        brand: mongoose.Types.ObjectId(brandId),
-        productCategory: mongoose.Types.ObjectId(productCategoryId),
+      $match: matchFilters, // Apply all filters here
+    },
+    {
+      // Add computed field for popularityScore
+      $addFields: {
+        popularityScore: {
+          $add: [
+            { $multiply: ['$soldCount', 0.5] }, // Adjust weights as needed
+            { $multiply: ['$reviewCount', 0.3] },
+            { $multiply: ['$averageRating', 0.2] },
+          ],
+        },
       },
     },
     {
       $facet: {
         products: [
+          { $sort: sortOptions }, // Apply sorting options
           { $skip: (page - 1) * limit },
-          { $limit: limit }, // Apply pagination
+          { $limit: limit }, // Pagination
           {
             $project: {
               id: '$_id',
@@ -203,6 +283,10 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
               image: 1,
               price: 1,
               puff: 1,
+              stock: 1, // Add stock to show availability
+              nicotineStrength: 1,
+              flavor: 1,
+              averageRating: 1,
               _id: 0,
             },
           },
@@ -239,13 +323,11 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
     },
   ]);
 
-  res
-    .status(200)
-    .json(
-      products[0] || {
-        productsByBrandAndCategory: { products: [], remainingItems: 0 },
-      },
-    );
+  res.status(200).json(
+    products[0] || {
+      productsByBrandAndCategory: { products: [], remainingItems: 0 },
+    },
+  );
 });
 
 module.exports = {

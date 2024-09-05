@@ -77,6 +77,11 @@ const updateProduct = catchAsync(async (req, res, next) => {
       brand: req.body.brand || product.brand,
       flavor: req.body.flavor || product.flavor,
       nicotineStrength: +req.body.nicotineStrength || product.nicotineStrength,
+      soldCount: +req.body.soldCount || product.soldCount,
+      reviewCount: +req.body.reviewCount || product.reviewCount,
+      averageRating: +req.body.averageRating || product.averageRating,
+      viewCount: +req.body.viewCount || product.viewCount,
+      wishlistCount: +req.body.wishlistCount || product.wishlistCount,
     },
     {
       new: true, // Return the updated document

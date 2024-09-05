@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const AppError = require('../utils/appError');
 
 const productSchema = new mongoose.Schema(
   {
@@ -58,11 +59,14 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Brand',
     },
+    soldCount: { type: Number, default: 0 }, // Total units sold
+    reviewCount: { type: Number, default: 0 }, // Number of reviews
+    averageRating: { type: Number, default: 0 }, // Average product rating
+    viewCount: { type: Number, default: 0 }, // Number of times the product page was viewed
+    wishlistCount: { type: Number, default: 0 },
   },
-  { timestamps: true },
   {
-    _id: true, // Ensure _id is created for each subdocument
-    id: true, // Create a virtual 'id' field from '_id'
+    timestamps: true,
     toJSON: {
       virtuals: true,
       transform: function (doc, ret) {
@@ -80,6 +84,22 @@ const productSchema = new mongoose.Schema(
   },
 );
 
+// Virtual field for 'available'
+productSchema.virtual('available').get(function () {
+  return this.stock > 0;
+});
+
+// Method to reduce stock based on quantity
+productSchema.methods.reduceStock = async function (quantity) {
+  if (this.stock >= quantity) {
+    this.stock -= quantity;
+    await this.save();
+  } else {
+    throw new AppError('Insufficient stock', 400);
+  }
+};
+
+// Indexes
 productSchema.index({ productCategory: 1 });
 productSchema.index({ brand: 1 });
 
