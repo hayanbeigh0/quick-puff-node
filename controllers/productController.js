@@ -68,7 +68,7 @@ const updateProduct = catchAsync(async (req, res, next) => {
       description: req.body.description || product.description,
       price: +req.body.price || product.price,
       oldPrice: +req.body.oldPrice || product.oldPrice,
-      stock: +req.body.stock || product.stock,
+      stock: req.body.stock || product.stock,
       puff: +req.body.puff || product.puff,
       productCategory: req.body.productCategory || product.productCategory,
       brand: req.body.brand || product.brand,
