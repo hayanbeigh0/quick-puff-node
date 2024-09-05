@@ -61,6 +61,7 @@ const updateProduct = catchAsync(async (req, res, next) => {
     assetInfo = getImageUrl(publicId);
   }
 
+  console.log(req.body);
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
     id,
@@ -68,12 +69,14 @@ const updateProduct = catchAsync(async (req, res, next) => {
       name: req.body.name || product.name,
       image: assetInfo,
       description: req.body.description || product.description,
-      price: req.body.price || product.price,
-      oldPrice: req.body.oldPrice || product.oldPrice,
-      stock: req.body.stock || product.stock,
-      puff: req.body.puff || product.puff,
+      price: +req.body.price || product.price,
+      oldPrice: +req.body.oldPrice || product.oldPrice,
+      stock: +req.body.stock || product.stock,
+      puff: +req.body.puff || product.puff,
       productCategory: req.body.productCategory || product.productCategory,
       brand: req.body.brand || product.brand,
+      flavor: req.body.flavor || product.flavor,
+      nicotineStrength: +req.body.nicotineStrength || product.nicotineStrength,
     },
     {
       new: true, // Return the updated document

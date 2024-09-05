@@ -9,6 +9,7 @@ const brandCategoryRouter = require('./brandCategoryRouter');
 const brandRouter = require('./brandRouter');
 const homeRouter = require('./homeRouter');
 const categoryRouter = require('./categoryRouter');
+const flavorRouter = require('./flavorRouter');
 
 const router = express.Router();
 
@@ -21,5 +22,6 @@ router.use('/brandCategory', brandCategoryRouter);
 router.use('/brand', brandRouter);
 router.use('/home', homeRouter);
 router.use('/category', categoryRouter);
+router.use('/flavor', flavorRouter);
 
 module.exports = router;

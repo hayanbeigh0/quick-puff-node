@@ -38,6 +38,17 @@ const productSchema = new mongoose.Schema(
       default: Infinity,
       required: true,
     },
+    nicotineStrength: {
+      type: Number,
+      min: 0,
+      max: Infinity,
+      default: 0,
+      required: true,
+    },
+    flavor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Flavor',
+    },
     productCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ProductCategory',
@@ -48,6 +59,7 @@ const productSchema = new mongoose.Schema(
       ref: 'Brand',
     },
   },
+  { timestamps: true },
   {
     _id: true, // Ensure _id is created for each subdocument
     id: true, // Create a virtual 'id' field from '_id'
