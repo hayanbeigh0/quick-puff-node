@@ -12,7 +12,6 @@ const {
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
   // Proceed with product creation after file upload
-  console.log(req.body);
   const publicId = await uploadImage(req.file, 'products');
   const assetInfo = getImageUrl(publicId);
 
@@ -40,7 +39,6 @@ const createProduct = catchAsync(async (req, res, next) => {
 // Controller function to handle product update
 const updateProduct = catchAsync(async (req, res, next) => {
   const { id } = req.body;
-  console.log(req.file);
 
   // Find the product by ID
   const product = await Product.findById(id);
@@ -61,7 +59,6 @@ const updateProduct = catchAsync(async (req, res, next) => {
     assetInfo = getImageUrl(publicId);
   }
 
-  console.log(req.body);
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
     id,

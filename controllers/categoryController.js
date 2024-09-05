@@ -1,5 +1,3 @@
-// yourController.js
-
 const Brand = require('../models/brandModel');
 const catchAsync = require('../utils/catchAsync');
 const mongoose = require('mongoose');
@@ -23,7 +21,6 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
 
     // Try to get the cached response
     const cachedResponse = await cacheService.getItem(cacheKey);
-    console.log(cachedResponse);
     if (cachedResponse) {
       return res.status(200).json(cachedResponse);
     }
@@ -169,14 +166,12 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
 
     // Cache the response
     await cacheService.save(cacheKey, response, 600); // Cache for 10 minutes
-    console.log('saved');
-
     res.status(200).json(response);
   },
 );
 
 /**
- * Controller function to fetch products based on a brand ID and product category ID, with pagination.
+ * Controller function to fetch products based on a brand ID and product category ID, with pagination and filtering.
  */
 const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
   const { brandId, productCategoryId } = req.params;
@@ -203,7 +198,7 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
 
   // Apply filters based on query parameters
   if (deals) {
-    matchFilters.oldPrice = { $gt: 0 }; // Assuming deals mean discount (oldPrice exists)
+    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] };// Assuming deals mean discount (oldPrice exists)
   }
 
   if (available) {
@@ -287,6 +282,7 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
               nicotineStrength: 1,
               flavor: 1,
               averageRating: 1,
+              hasDeal: { $gt: ['$oldPrice', '$price'] }, // Check for deal status
               _id: 0,
             },
           },

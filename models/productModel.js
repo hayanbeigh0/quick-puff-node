@@ -89,6 +89,11 @@ productSchema.virtual('available').get(function () {
   return this.stock > 0;
 });
 
+// Virtual field for 'hasDeal'
+productSchema.virtual('hasDeal').get(function () {
+  return this.oldPrice > this.price;
+});
+
 // Method to reduce stock based on quantity
 productSchema.methods.reduceStock = async function (quantity) {
   if (this.stock >= quantity) {

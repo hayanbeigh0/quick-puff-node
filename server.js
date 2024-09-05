@@ -8,7 +8,6 @@ const cloudinary = require('cloudinary').v2;
 cloudinary.config({
   secure: true,
 });
-console.log(cloudinary.config());
 
 const DB = process.env.DATABASE.replace(
   '<PASSWORD>',
@@ -16,7 +15,12 @@ const DB = process.env.DATABASE.replace(
 );
 
 mongoose
-  .connect(DB)
+  .connect(DB, {
+    useNewUrlParser: true, // New URL string parser
+    useUnifiedTopology: true, // New server discovery and monitoring engine
+    useCreateIndex: true, // Deprecation warning for `ensureIndex`
+    useFindAndModify: false,
+  })
   .then(() => {
     console.log('DB connection successful!');
   })
