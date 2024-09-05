@@ -88,6 +88,8 @@ const homePageData = catchAsync(async (req, res, next) => {
                     id: '$_id', // Create `id` from `_id`
                     name: 1,
                     image: 1,
+                    price: 1,
+                    puff: 1,
                     _id: 0, // Exclude `_id`
                   },
                 },
