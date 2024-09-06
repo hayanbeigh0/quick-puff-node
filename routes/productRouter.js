@@ -25,5 +25,8 @@ router
 router
   .route('/search')
   .get(authController.protect, productController.searchProducts);
+router
+  .route('/search/suggestions')
+  .get(authController.protect, productController.getSearchSuggestions);
 
 module.exports = router;

@@ -181,6 +181,28 @@ const searchProducts = catchAsync(async (req, res, next) => {
   );
 });
 
+const getSearchSuggestions = catchAsync(async (req, res, next) => {
+  const query = req.query.searchText;
+
+  if (!query) {
+    return next(new AppError('Please provide a search query', 400));
+  }
+
+  // Define regex for case-insensitive and partial match
+  const regex = new RegExp(query, 'i');
+
+  // Find products where the name matches the regex
+  const suggestions = await Product.find({ name: { $regex: regex } })
+    .limit(10) // Limit to top 10 suggestions
+    .select('name') // Only return product names
+    .sort({ name: 1 }); // Optionally sort alphabetically
+
+  res.status(200).json({
+    status: 'success',
+    suggestions,
+  });
+});
+
 const getProducts = factory.getAll(Product);
 
 // Export middleware and controller functions
@@ -190,4 +212,5 @@ module.exports = {
   getProducts,
   updateProduct,
   searchProducts,
+  getSearchSuggestions,
 };
