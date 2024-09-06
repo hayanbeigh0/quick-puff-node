@@ -198,7 +198,7 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
 
   // Apply filters based on query parameters
   if (deals) {
-    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] };// Assuming deals mean discount (oldPrice exists)
+    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] }; // Assuming deals mean discount (oldPrice exists)
   }
 
   if (available) {
@@ -320,13 +320,88 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
   ]);
 
   res.status(200).json(
-    products[0] || {
-      productsByBrandAndCategory: { products: [], remainingItems: 0 },
+    { status: 'success', ...products[0] } || {
+      productsByBrandAndCategory: {
+        status: 'success',
+        products: [],
+        remainingItems: 0,
+      },
     },
   );
 });
 
+const getTotalProductsCountByBrandAndCategory = catchAsync(
+  async (req, res, next) => {
+    const { brandId, productCategoryId } = req.params;
+
+    // Extract filters from query params
+    const {
+      deals, // Boolean for deals
+      available, // Boolean for availability
+      flavor, // Flavor ObjectId
+      maxPuff, // Maximum puff count
+      nicotineStrength, // Nicotine Strength
+      minPrice, // Minimum Price
+      maxPrice, // Maximum Price
+    } = req.query;
+
+    // Define match filters
+    const matchFilters = {
+      brand: mongoose.Types.ObjectId(brandId),
+      productCategory: mongoose.Types.ObjectId(productCategoryId),
+    };
+
+    // Apply filters based on query parameters
+    if (deals) {
+      matchFilters.$expr = { $gt: ['$oldPrice', '$price'] }; // Assuming deals mean discount (oldPrice exists)
+    }
+
+    if (available) {
+      matchFilters.stock = { $gt: 0 }; // Products with stock greater than 0
+    }
+
+    if (flavor) {
+      matchFilters.flavor = mongoose.Types.ObjectId(flavor);
+    }
+
+    if (maxPuff) {
+      matchFilters.puff = { $lte: parseInt(maxPuff, 10) }; // Puff count should be less than or equal to maxPuff
+    }
+
+    if (nicotineStrength) {
+      matchFilters.nicotineStrength = parseInt(nicotineStrength, 10); // Nicotine strength filter
+    }
+
+    if (minPrice || maxPrice) {
+      matchFilters.price = {};
+      if (minPrice) {
+        matchFilters.price.$gte = parseInt(minPrice, 10); // Minimum price
+      }
+      if (maxPrice) {
+        matchFilters.price.$lte = parseInt(maxPrice, 10); // Maximum price
+      }
+    }
+
+    // Query to get the total number of matching products
+    const totalProductsCount = await Product.aggregate([
+      {
+        $match: matchFilters, // Apply all filters
+      },
+      {
+        $count: 'totalCount', // Count total matching products
+      },
+    ]);
+
+    // Send the total count in the response
+    res.status(200).json({
+      status: 'success',
+      totalProductsCount: totalProductsCount[0]?.totalCount || 0,
+    });
+  },
+);
+
 module.exports = {
   getBrandsAndProductsByBrandCategory,
   getProductsByBrandAndCategory,
+  getTotalProductsCountByBrandAndCategory,
 };

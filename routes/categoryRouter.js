@@ -13,5 +13,9 @@ router.route('/:brandId/:productCategoryId').get(
   authController.protect, // Ensure the user is authenticated
   categoryController.getProductsByBrandAndCategory, // Create the product
 );
+router.route('/:brandId/:productCategoryId/count').get(
+  authController.protect, // Ensure the user is authenticated
+  categoryController.getTotalProductsCountByBrandAndCategory, // Create the product
+);
 
 module.exports = router;
