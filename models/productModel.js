@@ -107,6 +107,7 @@ productSchema.methods.reduceStock = async function (quantity) {
 // Indexes
 productSchema.index({ productCategory: 1 });
 productSchema.index({ brand: 1 });
+productSchema.index({ name: 1 });
 
 const Product = mongoose.model('Product', productSchema);
 

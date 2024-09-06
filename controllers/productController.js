@@ -116,6 +116,62 @@ const deleteProduct = catchAsync(async (req, res, next) => {
   });
 });
 
+const searchProducts = catchAsync(async (req, res, next) => {
+  const { searchText } = req.query;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 10;
+
+  if (!searchText) {
+    return next(new AppError('Please provide a search query', 400));
+  }
+
+  // Define regex for case-insensitive and partial match
+  const regex = new RegExp(searchText, 'i');
+
+  // Search products by name using regex
+  const products = await Product.aggregate([
+    {
+      $match: {
+        name: { $regex: regex }, // Use regex for partial and case-insensitive match
+      },
+    },
+    {
+      $facet: {
+        products: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $project: {
+              id: '$_id',
+              name: 1,
+              image: 1,
+              price: 1,
+              puff: 1,
+              stock: 1,
+              nicotineStrength: 1,
+              flavor: 1,
+              averageRating: 1,
+              _id: 0,
+            },
+          },
+        ],
+        totalCount: [{ $count: 'count' }],
+      },
+    },
+    {
+      $project: {
+        totalCount: 0,
+      },
+    },
+  ]);
+
+  res.status(200).json(
+    { status: 'success', ...products[0] } || {
+      productsByName: { status: 'success', products: [] },
+    },
+  );
+});
+
 const getProducts = factory.getAll(Product);
 
 // Export middleware and controller functions
@@ -124,4 +180,5 @@ module.exports = {
   deleteProduct,
   getProducts,
   updateProduct,
+  searchProducts,
 };

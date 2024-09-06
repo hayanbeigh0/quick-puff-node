@@ -22,5 +22,8 @@ router
 router
   .route('/:productId')
   .delete(authController.protect, productController.deleteProduct);
+router
+  .route('/search')
+  .get(authController.protect, productController.searchProducts);
 
 module.exports = router;
