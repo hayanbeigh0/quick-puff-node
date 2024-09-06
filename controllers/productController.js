@@ -8,6 +8,7 @@ const {
   deleteImage,
   extractPublicIdFromUrl,
 } = require('../utils/cloudfs');
+const RecentSearch = require('../models/recentSearchModel');
 
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
@@ -164,6 +165,14 @@ const searchProducts = catchAsync(async (req, res, next) => {
       },
     },
   ]);
+
+  // If products are found, add the search query to recent searches
+  // Add the search query to recent searches
+  await RecentSearch.findOneAndUpdate(
+    { user: req.user.id, searchQuery: searchText },
+    { user: req.user.id, searchQuery: searchText },
+    { upsert: true, new: true },
+  );
 
   res.status(200).json(
     { status: 'success', ...products[0] } || {
