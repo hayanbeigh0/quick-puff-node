@@ -21,9 +21,9 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
 
     // Try to get the cached response
     const cachedResponse = await cacheService.getItem(cacheKey);
-    // if (cachedResponse) {
-    //   return res.status(200).json(cachedResponse);
-    // }
+    if (cachedResponse) {
+      return res.status(200).json(cachedResponse);
+    }
 
     // Fetch brands and products from the database
     const brandsAndProducts = await Brand.aggregate([
