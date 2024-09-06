@@ -32,7 +32,8 @@ const homePageData = catchAsync(async (req, res, next) => {
   }
 
   // Check if data is in cache
-  let productCategories = productCategoryCache.get('productCategories');
+  let productCategories ;
+  // let productCategories = productCategoryCache.get('productCategories');
 
   if (!productCategories) {
     // Fetch from database if not in cache
