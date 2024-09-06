@@ -167,6 +167,7 @@ const searchProducts = catchAsync(async (req, res, next) => {
               image: 1,
               price: 1,
               puff: 1,
+              volume: 1,
               stock: 1,
               nicotineStrength: 1,
               flavor: 1,
