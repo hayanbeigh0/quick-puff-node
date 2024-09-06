@@ -21,9 +21,9 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
 
     // Try to get the cached response
     const cachedResponse = await cacheService.getItem(cacheKey);
-    if (cachedResponse) {
-      return res.status(200).json(cachedResponse);
-    }
+    // if (cachedResponse) {
+    //   return res.status(200).json(cachedResponse);
+    // }
 
     // Fetch brands and products from the database
     const brandsAndProducts = await Brand.aggregate([
@@ -72,6 +72,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
                       image: 1,
                       price: 1,
                       puff: 1,
+                      volume: 1,
                       _id: 0,
                     },
                   },
@@ -278,6 +279,7 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
               image: 1,
               price: 1,
               puff: 1,
+              volume: 1,
               stock: 1, // Add stock to show availability
               nicotineStrength: 1,
               flavor: 1,

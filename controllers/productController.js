@@ -12,6 +12,9 @@ const RecentSearch = require('../models/recentSearchModel');
 
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
+  if (req.body.puff && req.body.volume) {
+    return next(new AppError('Either puff or volume must be provided.', 400));
+  }
   // Proceed with product creation after file upload
   const publicId = await uploadImage(req.file, 'products');
   const assetInfo = getImageUrl(publicId);
@@ -25,6 +28,7 @@ const createProduct = catchAsync(async (req, res, next) => {
     oldPrice: req.body.oldPrice,
     stock: req.body.stock,
     puff: req.body.puff,
+    volume: req.body.volume,
     productCategory: req.body.productCategory,
     brand: req.body.brand,
   });
@@ -40,6 +44,10 @@ const createProduct = catchAsync(async (req, res, next) => {
 // Controller function to handle product update
 const updateProduct = catchAsync(async (req, res, next) => {
   const { id } = req.body;
+
+  if (req.body.puff && req.body.volume) {
+    return next(new AppError('Either puff or volume must be provided.', 400));
+  }
 
   // Find the product by ID
   const product = await Product.findById(id);
@@ -70,7 +78,18 @@ const updateProduct = catchAsync(async (req, res, next) => {
       price: +req.body.price || product.price,
       oldPrice: +req.body.oldPrice || product.oldPrice,
       stock: req.body.stock || product.stock,
-      puff: +req.body.puff || product.puff,
+      puff:
+        req.body.puff !== undefined
+          ? +req.body.puff
+          : req.body.volume
+            ? null
+            : product.puff, // Set puff or null
+      volume:
+        req.body.volume !== undefined
+          ? +req.body.volume
+          : req.body.puff
+            ? null
+            : product.volume, // Set volume or null
       productCategory: req.body.productCategory || product.productCategory,
       brand: req.body.brand || product.brand,
       flavor: req.body.flavor || product.flavor,

@@ -101,6 +101,7 @@ const homePageData = catchAsync(async (req, res, next) => {
                     image: 1,
                     price: 1,
                     puff: 1,
+                    volume: 1,
                     productCategory: '$productCategoryInfo.name', // Include product category name
                     _id: 0, // Exclude `_id`
                   },

@@ -36,8 +36,27 @@ const productSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       max: Infinity,
-      default: Infinity,
-      required: true,
+      default: null,
+      validate: {
+        validator: function (v) {
+          // Check if either puff or volume is set, but not both
+          return this.volume == null || v == null;
+        },
+        message: 'Either puff or volume should be set, not both.',
+      },
+    },
+    volume: {
+      type: Number,
+      min: 0,
+      max: Infinity,
+      default: null,
+      validate: {
+        validator: function (v) {
+          // Check if either volume or puff is set, but not both
+          return this.puff == null || v == null;
+        },
+        message: 'Either puff or volume should be set, not both.',
+      },
     },
     nicotineStrength: {
       type: Number,
