@@ -15,7 +15,7 @@ const router = require('./routes/router');
 const app = express();
 
 // Trust the reverse proxy (e.g., Vercel)
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 // Middlewares
 // Set security HTTP headers
