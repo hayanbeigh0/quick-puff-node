@@ -24,7 +24,7 @@ const productCategoryCache = new NodeCache({ stdTTL: 3600 });
 const homePageData = catchAsync(async (req, res, next) => {
   // Extract pagination parameters from query string
   const page = parseInt(req.query.page, 10) || 1; // Default to page 1
-  const limit = parseInt(req.query.limit, 10) || 10; // Default to 10 items per page
+  const limit = parseInt(req.query.limit, 10) || 2; // Default to 10 items per page
 
   // Ensure page and limit are positive integers
   if (page < 1 || limit < 1) {
@@ -80,6 +80,17 @@ const homePageData = catchAsync(async (req, res, next) => {
             },
           },
           {
+            $lookup: {
+              from: 'productcategories', // Lookup for product category information
+              localField: 'productCategory',
+              foreignField: '_id',
+              as: 'productCategoryInfo',
+            },
+          },
+          {
+            $unwind: '$productCategoryInfo', // Unwind the product category array
+          },
+          {
             $facet: {
               products: [
                 { $limit: 10 }, // Fetch only 10 products
@@ -90,6 +101,7 @@ const homePageData = catchAsync(async (req, res, next) => {
                     image: 1,
                     price: 1,
                     puff: 1,
+                    productCategory: '$productCategoryInfo.name', // Include product category name
                     _id: 0, // Exclude `_id`
                   },
                 },
@@ -107,6 +119,7 @@ const homePageData = catchAsync(async (req, res, next) => {
                   in: { $max: [{ $subtract: ['$$totalItems', 10] }, 0] }, // Ensure non-negative remainingItems
                 },
               },
+              productCategory: { $first: '$products.productCategory' }, // Add category of products
             },
           },
           {
