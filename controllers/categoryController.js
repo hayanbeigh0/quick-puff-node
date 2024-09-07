@@ -121,7 +121,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             {
               $project: {
                 id: '$_id',
-                brandName: '$name',
+                name: '$name',
                 products: '$productsData.products',
                 remainingItems: '$productsData.remainingItems',
                 _id: 0,
@@ -137,7 +137,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             {
               $project: {
                 id: '$_id',
-                brandName: '$name',
+                name: '$name',
                 image: 1,
                 _id: 0,
               },
