@@ -5,7 +5,6 @@ const catchAsync = require('../utils/catchAsync');
 const addRecentSearch = catchAsync(async (req, res, next) => {
   const { searchQuery } = req.body;
   const userId = req.user.id;
-  console.log(searchQuery, userId);
 
   await RecentSearch.findOneAndUpdate(
     { user: userId, searchQuery },
@@ -45,9 +44,13 @@ const deleteRecentSearch = catchAsync(async (req, res, next) => {
     return next(new AppError('No recent search found with that ID', 404));
   }
 
+  const recentSearches = await RecentSearch.find({ user: userId })
+    .sort({ searchedAt: -1 })
+    .limit(10);
+
   res.status(204).json({
     status: 'success',
-    message: 'Search deleted from recent searches',
+    recentSearches,
   });
 });
 
