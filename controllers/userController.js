@@ -41,6 +41,33 @@ const addDeliveryAddressLocations = catchAsync(async (req, res, next) => {
   });
 });
 
+const getActiveDeliveryAddressLocationOfUser = catchAsync(
+  async (req, res, next) => {
+    // Find the user by ID
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return next(new AppError('No user found with that ID', 400));
+    }
+
+    // Find the active (default) delivery address
+    const activeDeliveryAddress = user.deliveryAddressLocations.find(
+      (address) => address.default === true,
+    );
+
+    if (!activeDeliveryAddress) {
+      return next(new AppError('No default delivery address found', 404));
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        deliveryAddressLocation: activeDeliveryAddress,
+      },
+    });
+  },
+);
+
 const removeDeliveryAddressLocation = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user._id);
 
@@ -161,4 +188,5 @@ module.exports = {
   removeDeliveryAddressLocation,
   setDefaultDeliveryAddressLocations,
   updateDeliveryAddressLocation,
+  getActiveDeliveryAddressLocationOfUser,
 };

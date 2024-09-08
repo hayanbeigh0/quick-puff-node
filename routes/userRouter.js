@@ -13,6 +13,13 @@ router
   .patch(authController.protect, userController.updateDeliveryAddressLocation);
 
 router
+  .route('/myDeliveryAddressLocations/active')
+  .get(
+    authController.protect,
+    userController.getActiveDeliveryAddressLocationOfUser,
+  );
+
+router
   .route('/myDeliveryAddressLocations/:deliveryLocationId')
   .delete(authController.protect, userController.removeDeliveryAddressLocation);
 
