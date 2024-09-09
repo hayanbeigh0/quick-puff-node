@@ -1,5 +1,4 @@
 const ProductCategory = require('../models/productCategoryModel');
-const ServiceableLocation = require('../models/serviceableLocation');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const factory = require('./handlerFactory');

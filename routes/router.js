@@ -11,6 +11,7 @@ const homeRouter = require('./homeRouter');
 const categoryRouter = require('./categoryRouter');
 const flavorRouter = require('./flavorRouter');
 const recentSearchRouter = require('./recentSearchRouter');
+const cartRouter = require('./cartRouter');
 
 const router = express.Router();
 
@@ -25,5 +26,5 @@ router.use('/home', homeRouter);
 router.use('/category', categoryRouter);
 router.use('/flavor', flavorRouter);
 router.use('/recentSearch', recentSearchRouter);
-
+router.use('/cart', cartRouter);
 module.exports = router;

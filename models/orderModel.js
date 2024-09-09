@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const cartSchema = new mongoose.Schema(
+const orderSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -17,13 +17,35 @@ const cartSchema = new mongoose.Schema(
         quantity: {
           type: Number,
           required: true,
-          min: 1,
         },
       },
     ],
-    totalPrice: {
+    deliveryAddress: {
+      type: String,
+      required: true,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['cash_on_delivery', 'credit_card'],
+      required: true,
+    },
+    tipAmount: {
       type: Number,
       default: 0,
+    },
+    promoCode: String,
+    totalPrice: {
+      type: Number,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['Processing', 'Delivered', 'Cancelled'],
+      default: 'Processing',
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
   },
   { timestamps: true },
@@ -47,25 +69,4 @@ const cartSchema = new mongoose.Schema(
   },
 );
 
-cartSchema.methods.calculateTotalPrice = async function () {
-  // Populating the product details to access the price
-  await this.populate('items.product').execPopulate();
-
-  // Calculate total price by summing up the price of each product times its quantity
-  let total = 0;
-
-  this.items.forEach((item) => {
-    const productPrice = item.product.price || 0; // Fallback to 0 if price not set
-    total += productPrice * item.quantity;
-  });
-
-  // Set the total price for the cart
-  this.totalPrice = total;
-
-  // Return the total price
-  return this.totalPrice;
-};
-
-const Cart = mongoose.model('Cart', cartSchema);
-
-module.exports = Cart;
+const Order = mongoose.model('Order', orderSchema);
