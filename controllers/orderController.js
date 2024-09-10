@@ -62,13 +62,23 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('User not found or missing date of birth', 400));
   }
 
+  if (!user.idVerified) {
+    return next(
+      new AppError(
+        'User ID not verified!',
+        400,
+        ErrorCodes.USER_ID_NOT_VERIFIED.code,
+      ),
+    );
+  }
+
   const userAge = calculateAge(user.dateOfBirth);
   if (userAge < MINIMUM_AGE) {
     return next(
       new AppError(
         `You must be at least ${MINIMUM_AGE} years old to place an order`,
         403,
-        ErrorCodes.MIN_AGE_RESTRICTION,
+        ErrorCodes.MIN_AGE_RESTRICTION.code,
       ),
     );
   }
@@ -138,7 +148,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
         new AppError(
           `Minimum order value to apply this promo code is $${promo.minOrderValue}`,
           400,
-          ErrorCodes.MIN_ORDER_AMOUNT_RESTRICTION,
+          ErrorCodes.MIN_ORDER_AMOUNT_RESTRICTION.code,
         ),
       );
     }

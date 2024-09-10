@@ -37,7 +37,10 @@ const ErrorCodes = {
     code: 'USER002',
   },
   MIN_ORDER_AMOUNT_RESTRICTION: {
-    code: 'ORDER001',
+    code: 'ORDER003',
+  },
+  USER_ID_NOT_VERIFIED: {
+    code: 'ORDER004',
   },
 };
 

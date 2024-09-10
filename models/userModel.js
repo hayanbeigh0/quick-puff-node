@@ -77,6 +77,11 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: false,
     },
+    idVerified: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     verificationCode: String,
     verificationCodeExpires: Date,
     photo: {
