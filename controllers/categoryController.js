@@ -179,73 +179,78 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
         },
       },
       {
-        $skip: (page - 1) * limit, // Pagination: skip to the correct page
-      },
-      {
-        $limit: limit, // Limit the number of brands returned
+        $sort: {
+          'name': 1, // Sort brands by name (or any other consistent field)
+        },
       },
     ]);
 
-    // Step 3: Map through the brands and apply product limit
-    const response = {
-      brandCategoryName:
-        brandsSellingCategory.length > 0
-          ? brandsSellingCategory[0].brandCategoryName // Use brandCategoryName from the aggregation
-          : '',
+    // Step 3: Apply sorting, limit, and pagination to brandsSellingCategory
+    const sortedBrands = brandsSellingCategory
+      .sort((a, b) => a.name.localeCompare(b.name)) // Ensure consistent sorting by brand name
+      .slice(0, 8); // Limit to 8 items
 
-      brands: brandsSellingCategory.map((brand) => ({
-        name: brand.name,
-        image: brand.image,
-        id: brand.id,
-      })),
+    // Step 4: Apply productsLimit to brandsAndProducts
+    const brandsAndProducts = sortedBrands
+      .map((brand) => {
+        const sortedProducts = brand.products
+          .sort((a, b) => a.name.localeCompare(b.name)) // Sort products consistently
+          .slice(0, productsLimit); // Limit the number of products
 
-      brandsAndProducts: brandsSellingCategory
-        .map((brand) => {
-          const totalProducts = brand.products.length;
-          const products = brand.products.slice(0, productsLimit); // Limit products to 10
-          const remainingItems =
-            totalProducts - productsLimit > 0
-              ? totalProducts - productsLimit
-              : 0;
+        const totalProducts = brand.products.length;
+        const remainingItems =
+          totalProducts - productsLimit > 0
+            ? totalProducts - productsLimit
+            : 0;
 
-          return {
-            id: brand.id,
-            name: brand.name,
-            products: products.map((product) => ({
-              id: product.id,
-              name: product.name,
-              image: product.image,
-              price: product.price,
-              puff: product.puff,
-              volume: product.volume,
-            })),
-            remainingItems, // Remaining products count
-          };
-        })
-        .filter((brand) => brand.products.length > 0), // Filter out brands without products
-    };
+        return {
+          id: brand.id,
+          name: brand.name,
+          products: sortedProducts.map((product) => ({
+            id: product.id,
+            name: product.name,
+            image: product.image,
+            price: product.price,
+            puff: product.puff,
+            volume: product.volume,
+          })),
+          remainingItems, // Remaining products count
+        };
+      })
+      .filter((brand) => brand.products.length > 0) // Filter out brands without products
+      .slice((page - 1) * limit, page * limit); // Pagination for productsAndBrands
 
-    // Step 4: Add pagination information
+    // Step 5: Add pagination information
     const pageInfo = {
       page,
       limit,
       totalPages: Math.ceil(totalBrands / limit),
       totalItems: totalBrands,
     };
-    // Assuming `response` is the current data object you're dealing with
 
-    response.brandsAndProducts = response.brandsAndProducts.filter(
-      (brand) =>
-        brand.products && brand.products.length > 0 && brand.products[0].id,
-    );
+    // Cache the response
+    const response = {
+      brandCategoryName:
+        sortedBrands.length > 0
+          ? sortedBrands[0].brandCategoryName // Use brandCategoryName from the aggregation
+          : '',
 
-    // // Cache the response
+      brands: sortedBrands.map((brand) => ({
+        name: brand.name,
+        image: brand.image,
+        id: brand.id,
+      })),
+
+      brandsAndProducts,
+    };
+
     await cacheService.save(cacheKey, response, 600); // Cache for 10 minutes
 
     // Final response
     return res.status(200).json({ status: 'success', ...response, pageInfo });
-  },
+  }
 );
+
 
 /**
  * Controller function to fetch products based on a brand ID and product category ID, with pagination and filtering.
