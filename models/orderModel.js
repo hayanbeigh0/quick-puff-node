@@ -52,6 +52,11 @@ const orderSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    userContact: {
+      name: String,
+      phone: String,
+      email: String,
+    },
     items: [
       {
         product: {
@@ -71,6 +76,12 @@ const orderSchema = new mongoose.Schema(
       enum: ['cash_on_delivery', 'credit_card_on_delivery', 'credit_card'],
       required: true,
     },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'failed'],
+      default: 'pending',
+    },
+    transactionId: String,
     tipAmount: {
       type: Number,
       default: 0,
@@ -88,35 +99,22 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    trackingNumber: String,
     status: {
       type: String,
       enum: ['pending', 'processing', 'delivered', 'canceled'],
       default: 'pending',
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
+    statusHistory: [
+      {
+        status: String,
+        changedAt: Date,
+      },
+    ],
+    deliveredAt: Date,
+    orderNotes: String,
   },
   { timestamps: true },
-  {
-    _id: true, // Ensure _id is created for each subdocument
-    id: true, // Create a virtual 'id' field from '_id'
-    toJSON: {
-      virtuals: true,
-      transform: function (doc, ret) {
-        ret.id = ret._id;
-        delete ret._id;
-      },
-    },
-    toObject: {
-      virtuals: true,
-      transform: function (doc, ret) {
-        ret.id = ret._id;
-        delete ret._id;
-      },
-    },
-  },
 );
 
 const Order = mongoose.model('Order', orderSchema);

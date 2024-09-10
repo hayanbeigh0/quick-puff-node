@@ -174,7 +174,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
 
     const response = {
       status: 'success',
-      brandCategory: brandsAndProducts[0].brandCategory[0]?.brandCategory, // Get the brand category name
+      brandCategoryName: brandsAndProducts[0].brandCategory[0]?.brandCategory, // Get the brand category name
       brands: brandsAndProducts[0].brands,
       brandsAndProducts: brandsAndProducts[0].brandsAndProducts,
       pageInfo: {

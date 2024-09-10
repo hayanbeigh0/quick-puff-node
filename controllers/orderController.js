@@ -22,6 +22,7 @@ const calculateAge = (dob) => {
 const DELIVERY_FEE_BASE = 5; // Base fee for delivery
 const SERVICE_FEE_BASE = 1.5; // Base fee for service
 const MIN_DELIVERY_AMOUNT = 15;
+const RAZORPAY_SECRET = '<RAZORPAY_SECRET>';
 
 // Hardcoded seller's location (longitude, latitude)
 const sellerLocation = {
@@ -32,6 +33,24 @@ const sellerLocation = {
 // Helper function to calculate distance in kilometers
 const calculateDistance = (fromLocation, toLocation) => {
   return geolib.getDistance(fromLocation, toLocation) / 1000; // Convert meters to kilometers
+};
+
+const verifyPayment = async (paymentGatewayResponse) => {
+  // Depending on the gateway, you will verify the payment.
+  // Example with Razorpay:
+  const { paymentId, orderId, signature } = paymentGatewayResponse;
+
+  // Razorpay signature verification example (pseudo code):
+  const generatedSignature = crypto
+    .createHmac('sha256', RAZORPAY_SECRET)
+    .update(orderId + '|' + paymentId)
+    .digest('hex');
+
+  if (generatedSignature !== signature) {
+    throw new AppError('Payment verification failed', 400);
+  }
+
+  return true;
 };
 
 const createOrder = setTransaction(async (req, res, next, session) => {
@@ -136,7 +155,25 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   // 9. Calculate the final total price including delivery and service fees
   let totalPrice = productTotalPrice + deliveryFee + serviceFee;
 
-  // 10. Create the order
+  // 10. Set payment details based on the payment method
+  let paymentStatus = 'pending'; // For 'cash_on_delivery' or 'credit_card_on_delivery'
+  let transactionId = null;
+
+  if (req.body.paymentMethod === 'credit_card') {
+    // Verify the payment if it's a credit card payment
+    const paymentVerified = await verifyPayment(
+      req.body.paymentGatewayResponse,
+    );
+
+    if (!paymentVerified) {
+      return next(new AppError('Payment verification failed', 400));
+    }
+
+    paymentStatus = 'paid';
+    transactionId = req.body.transactionId; // Set transaction ID for successful card payments
+  }
+
+  // 11. Create the order and set all relevant fields
   const newOrder = await Order.create(
     [
       {
@@ -147,26 +184,33 @@ const createOrder = setTransaction(async (req, res, next, session) => {
         })),
         deliveryAddress: deliveryAddress,
         paymentMethod: req.body.paymentMethod,
+        paymentStatus: paymentStatus, // 'pending' for COD or 'paid' for successful credit card payments
+        transactionId: transactionId, // Set transaction ID only for credit card payments
         tipAmount: tipAmount,
         promoCode: promoCode,
         totalPrice: totalPrice,
         serviceFee: serviceFee,
         deliveryFee: deliveryFee,
+        trackingNumber: req.body.trackingNumber || '', // Set tracking number if available
+        status: 'pending', // Initial status of the order
+        statusHistory: [{ status: 'pending', changedAt: new Date() }], // Initialize status history
+        orderNotes: req.body.orderNotes || '', // Optional order notes from user
       },
     ],
     { session },
   );
 
+  // 12. Restore the inventory
   for (const item of cart.items) {
-    await Product.findByIdAndUpdate(item.product.id, {
+    await Product.findByIdAndUpdate(item.product._id, {
       $inc: { stock: -item.quantity },
     }).session(session);
   }
 
-  // 11. Optionally clear the cart after order creation
+  // 13. Clear the cart after order creation
   await Cart.findOneAndDelete({ user: userId }).session(session);
 
-  // 12. Send response with the created order
+  // 14. Send response with the created order
   res.status(201).json({
     status: 'success',
     data: {
@@ -201,9 +245,7 @@ const cancelOrder = setTransaction(async (req, res, next, session) => {
     );
   }
 
-  // 3. Optionally, handle logic to restore inventory if necessary
-  // (You might want to update product stock if applicable)
-  // For example:
+  // 3. Logic to restore inventory
   for (const item of order.items) {
     await Product.findByIdAndUpdate(item.product, {
       $inc: { stock: item.quantity },
