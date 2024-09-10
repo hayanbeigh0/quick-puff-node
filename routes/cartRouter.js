@@ -7,8 +7,6 @@ const router = express.Router();
 
 router.use(authController.protect);
 
-console.log('in the router...');
-
 router
   .route('/')
   .post(cartController.addItemToCart)

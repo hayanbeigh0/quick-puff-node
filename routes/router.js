@@ -12,6 +12,7 @@ const categoryRouter = require('./categoryRouter');
 const flavorRouter = require('./flavorRouter');
 const recentSearchRouter = require('./recentSearchRouter');
 const cartRouter = require('./cartRouter');
+const orderRouter = require('./orderRouter');
 
 const router = express.Router();
 
@@ -27,4 +28,5 @@ router.use('/category', categoryRouter);
 router.use('/flavor', flavorRouter);
 router.use('/recentSearch', recentSearchRouter);
 router.use('/cart', cartRouter);
+router.use('/order', orderRouter);
 module.exports = router;

@@ -1,5 +1,50 @@
 const mongoose = require('mongoose');
 
+const deliveryAddressLocationSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+    },
+    type: {
+      type: String,
+      default: 'Point',
+      enum: ['Point'],
+    },
+    coordinates: {
+      type: [Number],
+    },
+    floor: String,
+    appartment: String,
+    addressDetails: String,
+    addressPhoneNumber: String,
+    description: String,
+    default: {
+      type: Boolean,
+      default: false,
+      required: [true, 'A User must have a default delivery address'],
+    },
+  },
+  {
+    _id: true, // Ensure _id is created for each subdocument
+    id: true, // Create a virtual 'id' field from '_id'
+    toJSON: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+      },
+    },
+  },
+);
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -20,13 +65,10 @@ const orderSchema = new mongoose.Schema(
         },
       },
     ],
-    deliveryAddress: {
-      type: String,
-      required: true,
-    },
+    deliveryAddress: deliveryAddressLocationSchema,
     paymentMethod: {
       type: String,
-      enum: ['cash_on_delivery', 'credit_card'],
+      enum: ['cash_on_delivery', 'credit_card_on_delivery', 'credit_card'],
       required: true,
     },
     tipAmount: {
@@ -38,10 +80,18 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    serviceFee: {
+      type: Number,
+      default: 0,
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0,
+    },
     status: {
       type: String,
-      enum: ['Processing', 'Delivered', 'Cancelled'],
-      default: 'Processing',
+      enum: ['pending', 'processing', 'delivered', 'canceled'],
+      default: 'pending',
     },
     createdAt: {
       type: Date,
@@ -70,3 +120,5 @@ const orderSchema = new mongoose.Schema(
 );
 
 const Order = mongoose.model('Order', orderSchema);
+
+module.exports = Order;

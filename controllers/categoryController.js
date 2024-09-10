@@ -40,7 +40,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
               },
             },
             {
-              $project: { _id: 1 }, // We only need the IDs of the matching brand categories
+              $project: { _id: 1, name: 1 }, // Include brand category name
             },
           ],
           as: 'matchingBrandCategories',
@@ -142,19 +142,39 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
                 _id: 0,
               },
             },
+            { $limit: 8 },
+          ],
+          brandCategory: [
+            {
+              $project: {
+                brandCategory: {
+                  $arrayElemAt: ['$matchingBrandCategories.name', 0],
+                }, // Add brand category name
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                brandCategory: { $first: '$brandCategory' },
+              },
+            },
           ],
         },
       },
     ]);
 
+    const brandIds = brandsAndProducts[0].brands.map((b) => b.id);
+
+    // Count brands with the matching category
     const totalBrands = await Brand.countDocuments({
-      categories: {
-        $in: brandsAndProducts[0].brandsAndProducts.map((b) => b.id),
-      },
+      _id: { $in: brandIds },
+      // // Assuming you have a property that links to categories
+      categories: mongoose.Types.ObjectId(productCategoryId),
     });
 
     const response = {
       status: 'success',
+      brandCategory: brandsAndProducts[0].brandCategory[0]?.brandCategory, // Get the brand category name
       brands: brandsAndProducts[0].brands,
       brandsAndProducts: brandsAndProducts[0].brandsAndProducts,
       pageInfo: {

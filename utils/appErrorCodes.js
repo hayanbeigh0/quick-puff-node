@@ -33,6 +33,12 @@ const ErrorCodes = {
   UNAUTHORIZED: {
     code: 'USER001',
   },
+  MIN_AGE_RESTRICTION: {
+    code: 'USER002',
+  },
+  MIN_ORDER_AMOUNT_RESTRICTION: {
+    code: 'ORDER001',
+  },
 };
 
 module.exports = ErrorCodes;
