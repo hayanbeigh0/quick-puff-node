@@ -52,11 +52,6 @@ const orderSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
-    userContact: {
-      name: String,
-      phone: String,
-      email: String,
-    },
     items: [
       {
         product: {
@@ -98,6 +93,10 @@ const orderSchema = new mongoose.Schema(
     deliveryFee: {
       type: Number,
       default: 0,
+    },
+    orderNumber: {
+      type: String,
+      required: true,
     },
     trackingNumber: String,
     status: {

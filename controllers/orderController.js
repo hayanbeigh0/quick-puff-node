@@ -35,6 +35,27 @@ const calculateDistance = (fromLocation, toLocation) => {
   return geolib.getDistance(fromLocation, toLocation) / 1000; // Convert meters to kilometers
 };
 
+const generateUniqueOrderNumber = async () => {
+  let orderNumber;
+  let isUnique = false;
+
+  // Loop until we find a unique order number
+  while (!isUnique) {
+    // Generate a random 7-digit number
+    const randomCode = Math.floor(1000000 + Math.random() * 9000000); // Generates a random 7-digit number
+    orderNumber = `QPO-${randomCode}`;
+
+    // Check if this order number already exists in the database
+    const existingOrder = await Order.findOne({ orderNumber });
+
+    if (!existingOrder) {
+      isUnique = true; // If no existing order is found, this order number is unique
+    }
+  }
+
+  return orderNumber; // Return the unique order number
+};
+
 const verifyPayment = async (paymentGatewayResponse) => {
   // Depending on the gateway, you will verify the payment.
   // Example with Razorpay:
@@ -165,7 +186,10 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   // 9. Calculate the final total price including delivery and service fees
   let totalPrice = productTotalPrice + deliveryFee + serviceFee;
 
-  // 10. Set payment details based on the payment method
+  // 10. Generate a unique order number
+  const orderNumber = await generateUniqueOrderNumber();
+
+  // 11. Set payment details based on the payment method
   let paymentStatus = 'pending'; // For 'cash_on_delivery' or 'credit_card_on_delivery'
   let transactionId = null;
 
@@ -183,11 +207,12 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     transactionId = req.body.transactionId; // Set transaction ID for successful card payments
   }
 
-  // 11. Create the order and set all relevant fields
+  // 12. Create the order and set all relevant fields
   const newOrder = await Order.create(
     [
       {
         user: userId,
+        orderNumber: orderNumber, // Assign the unique order number here
         items: cart.items.map((item) => ({
           product: item.product._id,
           quantity: item.quantity,
@@ -210,17 +235,17 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     { session },
   );
 
-  // 12. Restore the inventory
+  // 13. Restore the inventory
   for (const item of cart.items) {
     await Product.findByIdAndUpdate(item.product._id, {
       $inc: { stock: -item.quantity },
     }).session(session);
   }
 
-  // 13. Clear the cart after order creation
+  // 14. Clear the cart after order creation
   await Cart.findOneAndDelete({ user: userId }).session(session);
 
-  // 14. Send response with the created order
+  // 15. Send response with the created order
   res.status(201).json({
     status: 'success',
     data: {
