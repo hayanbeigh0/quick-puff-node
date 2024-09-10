@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { nodeCacheProvider } = require('../providers/cacheProvider'); // Path to your NodeCache provider
 const createCacheService = require('../services/cacheService'); // Path to your cache service
 const Product = require('../models/productModel');
+const ProductCategory = require('../models/productCategoryModel');
 
 // Create the cache service instance with the NodeCache provider
 const cacheService = createCacheService(nodeCacheProvider);
@@ -16,6 +17,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
     const { productCategoryId } = req.params;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 8;
+    const productsLimit = parseInt(req.query.productsLimit, 10) || 8;
 
     const cacheKey = `brands-${productCategoryId}-page-${page}-limit-${limit}`;
 
@@ -25,169 +27,222 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
       return res.status(200).json(cachedResponse);
     }
 
-    // Fetch brands and products from the database
-    const brandsAndProducts = await Brand.aggregate([
+    const productCategoryIdObj = mongoose.Types.ObjectId(productCategoryId);
+
+    // Step 1: Count the total number of brands with products
+    const totalBrandsCount = await ProductCategory.aggregate([
+      {
+        $match: { _id: productCategoryIdObj },
+      },
       {
         $lookup: {
           from: 'brandcategories',
-          let: {
-            productCategoryId: mongoose.Types.ObjectId(productCategoryId),
-          },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $in: ['$$productCategoryId', '$productCategories'] },
-              },
-            },
-            {
-              $project: { _id: 1, name: 1 }, // Include brand category name
-            },
-          ],
-          as: 'matchingBrandCategories',
+          localField: '_id',
+          foreignField: 'productCategories',
+          as: 'matchedBrandCategories',
         },
       },
       {
-        $match: {
-          'matchingBrandCategories.0': { $exists: true }, // Filter brands that have at least one matching brand category
+        $unwind: '$matchedBrandCategories',
+      },
+      {
+        $lookup: {
+          from: 'brands',
+          localField: 'matchedBrandCategories._id',
+          foreignField: 'categories',
+          as: 'brandsSellingCategory',
         },
+      },
+      {
+        $unwind: '$brandsSellingCategory',
       },
       {
         $lookup: {
           from: 'products',
-          let: { brandId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ['$brand', '$$brandId'] },
-              },
-            },
-            {
-              $facet: {
-                products: [
-                  { $limit: 10 }, // Limit to 10 products
-                  {
-                    $project: {
-                      id: '$_id',
-                      name: 1,
-                      image: 1,
-                      price: 1,
-                      puff: 1,
-                      volume: 1,
-                      _id: 0,
-                    },
-                  },
-                ],
-                totalCount: [{ $count: 'count' }],
-              },
-            },
-            {
-              $addFields: {
-                remainingItems: {
-                  $let: {
-                    vars: {
-                      totalItems: { $arrayElemAt: ['$totalCount.count', 0] },
-                    },
-                    in: { $max: [{ $subtract: ['$$totalItems', 10] }, 0] },
-                  },
-                },
-              },
-            },
-            {
-              $project: {
-                totalCount: 0,
-              },
-            },
-          ],
-          as: 'productsData',
+          localField: 'brandsSellingCategory._id',
+          foreignField: 'brand',
+          as: 'productsForBrand',
         },
       },
       {
-        $addFields: {
-          productsData: {
-            $cond: {
-              if: { $eq: [{ $size: '$productsData' }, 0] },
-              then: [],
-              else: { $arrayElemAt: ['$productsData', 0] },
+        $unwind: {
+          path: '$productsForBrand',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $group: {
+          _id: '$brandsSellingCategory._id',
+          name: { $first: '$brandsSellingCategory.name' },
+          image: { $first: '$brandsSellingCategory.image' },
+          products: { $push: '$productsForBrand' },
+        },
+      },
+      {
+        $match: {
+          'products.0': { $exists: true }, // Only count brands with products
+        },
+      },
+    ]);
+
+    const totalBrands = totalBrandsCount.length;
+
+    // Step 2: Fetch paginated brands with products
+    const brandsSellingCategory = await ProductCategory.aggregate([
+      {
+        $match: {
+          _id: productCategoryIdObj,
+        },
+      },
+      {
+        $lookup: {
+          from: 'brandcategories',
+          localField: '_id',
+          foreignField: 'productCategories',
+          as: 'matchedBrandCategories',
+        },
+      },
+      {
+        $unwind: '$matchedBrandCategories',
+      },
+      {
+        $lookup: {
+          from: 'brands',
+          localField: 'matchedBrandCategories._id',
+          foreignField: 'categories',
+          as: 'brandsSellingCategory',
+        },
+      },
+      {
+        $unwind: '$brandsSellingCategory',
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'brandsSellingCategory._id',
+          foreignField: 'brand',
+          as: 'productsForBrand',
+        },
+      },
+      {
+        $unwind: {
+          path: '$productsForBrand',
+          preserveNullAndEmptyArrays: true, // Include brands without products
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          id: '$brandsSellingCategory._id',
+          name: '$brandsSellingCategory.name',
+          image: '$brandsSellingCategory.image',
+          brandCategoryName: '$matchedBrandCategories.name',
+          product: {
+            id: '$productsForBrand._id',
+            name: '$productsForBrand.name',
+            image: '$productsForBrand.image',
+            price: '$productsForBrand.price',
+            puff: '$productsForBrand.puff',
+            volume: '$productsForBrand.volume',
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$id',
+          name: { $first: '$name' },
+          image: { $first: '$image' },
+          brandCategoryName: { $first: '$brandCategoryName' },
+          products: { $push: '$product' },
+        },
+      },
+      {
+        // Filter out brands that have no products or products with empty objects
+        $project: {
+          id: '$_id',
+          name: 1,
+          image: 1,
+          brandCategoryName: 1,
+          products: {
+            $filter: {
+              input: '$products',
+              as: 'product',
+              cond: { $ne: ['$$product.id', null] }, // Only include valid products
             },
           },
         },
       },
       {
-        $facet: {
-          brandsAndProducts: [
-            {
-              $match: { 'productsData.products.0': { $exists: true } },
-            },
-            {
-              $project: {
-                id: '$_id',
-                name: '$name',
-                products: '$productsData.products',
-                remainingItems: '$productsData.remainingItems',
-                _id: 0,
-              },
-            },
-            { $skip: (page - 1) * limit },
-            { $limit: limit },
-          ],
-          brands: [
-            {
-              $match: { 'productsData.products.0': { $exists: false } },
-            },
-            {
-              $project: {
-                id: '$_id',
-                name: '$name',
-                image: 1,
-                _id: 0,
-              },
-            },
-            { $limit: 8 },
-          ],
-          brandCategory: [
-            {
-              $project: {
-                brandCategory: {
-                  $arrayElemAt: ['$matchingBrandCategories.name', 0],
-                }, // Add brand category name
-              },
-            },
-            {
-              $group: {
-                _id: null,
-                brandCategory: { $first: '$brandCategory' },
-              },
-            },
-          ],
+        $match: {
+          'products.0': { $exists: true }, // Filter out brands with no products
         },
+      },
+      {
+        $skip: (page - 1) * limit, // Pagination: skip to the correct page
+      },
+      {
+        $limit: limit, // Limit the number of brands returned
       },
     ]);
 
-    const brandIds = brandsAndProducts[0].brands.map((b) => b.id);
-
-    // Count brands with the matching category
-    const totalBrands = await Brand.countDocuments({
-      _id: { $in: brandIds },
-      // // Assuming you have a property that links to categories
-      categories: mongoose.Types.ObjectId(productCategoryId),
-    });
-
+    // Step 3: Map through the brands and apply product limit
     const response = {
-      status: 'success',
-      brandCategoryName: brandsAndProducts[0].brandCategory[0]?.brandCategory, // Get the brand category name
-      brands: brandsAndProducts[0].brands,
-      brandsAndProducts: brandsAndProducts[0].brandsAndProducts,
-      pageInfo: {
-        page,
-        limit,
-        totalPages: Math.ceil(totalBrands / limit),
-        totalItems: totalBrands,
-      },
+      brandCategoryName:
+        brandsSellingCategory.length > 0
+          ? brandsSellingCategory[0].brandCategoryName // Use brandCategoryName from the aggregation
+          : '',
+
+      brands: brandsSellingCategory.map((brand) => ({
+        name: brand.name,
+        image: brand.image,
+        id: brand.id,
+      })),
+
+      brandsAndProducts: brandsSellingCategory
+        .map((brand) => {
+          const totalProducts = brand.products.length;
+          const products = brand.products.slice(0, productsLimit); // Limit products to 10
+          const remainingItems =
+            totalProducts - productsLimit > 0
+              ? totalProducts - productsLimit
+              : 0;
+
+          return {
+            id: brand.id,
+            name: brand.name,
+            products: products.map((product) => ({
+              id: product.id,
+              name: product.name,
+              image: product.image,
+              price: product.price,
+              puff: product.puff,
+              volume: product.volume,
+            })),
+            remainingItems, // Remaining products count
+          };
+        })
+        .filter((brand) => brand.products.length > 0), // Filter out brands without products
     };
 
-    // Cache the response
+    // Step 4: Add pagination information
+    const pageInfo = {
+      page,
+      limit,
+      totalPages: Math.ceil(totalBrands / limit),
+      totalItems: totalBrands,
+    };
+    // Assuming `response` is the current data object you're dealing with
+
+    response.brandsAndProducts = response.brandsAndProducts.filter(
+      (brand) =>
+        brand.products && brand.products.length > 0 && brand.products[0].id,
+    );
+
+    // // Cache the response
     await cacheService.save(cacheKey, response, 600); // Cache for 10 minutes
-    res.status(200).json(response);
+
+    // Final response
+    return res.status(200).json({ status: 'success', ...response, pageInfo });
   },
 );
 
