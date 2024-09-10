@@ -168,7 +168,12 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             $filter: {
               input: '$products',
               as: 'product',
-              cond: { $ne: ['$$product.id', null] }, // Only include valid products
+              cond: {
+                $and: [
+                  { $ne: ['$$product.id', null] }, // Only include valid products
+                  { $ne: [{ $type: '$$product' }, 'missing'] }, // Exclude missing values
+                ],
+              },
             },
           },
         },
@@ -180,7 +185,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
       },
       {
         $sort: {
-          'name': 1, // Sort brands by name (or any other consistent field)
+          name: 1, // Sort brands by name (or any other consistent field)
         },
       },
     ]);
@@ -194,14 +199,13 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
     const brandsAndProducts = sortedBrands
       .map((brand) => {
         const sortedProducts = brand.products
+          .filter((product) => product && Object.keys(product).length > 0) // Ensure products are not empty
           .sort((a, b) => a.name.localeCompare(b.name)) // Sort products consistently
           .slice(0, productsLimit); // Limit the number of products
 
         const totalProducts = brand.products.length;
         const remainingItems =
-          totalProducts - productsLimit > 0
-            ? totalProducts - productsLimit
-            : 0;
+          totalProducts - productsLimit > 0 ? totalProducts - productsLimit : 0;
 
         return {
           id: brand.id,
@@ -244,13 +248,12 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
       brandsAndProducts,
     };
 
-    await cacheService.save(cacheKey, response, 600); // Cache for 10 minutes
+    await cacheService.save(cacheKey, response, 600);
 
     // Final response
     return res.status(200).json({ status: 'success', ...response, pageInfo });
-  }
+  },
 );
-
 
 /**
  * Controller function to fetch products based on a brand ID and product category ID, with pagination and filtering.
