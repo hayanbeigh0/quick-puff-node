@@ -22,7 +22,8 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
     const cacheKey = `brands-${productCategoryId}-page-${page}-limit-${limit}`;
 
     // Try to get the cached response
-    const cachedResponse = await cacheService.getItem(cacheKey);
+    let cachedResponse;
+    // const cachedResponse = await cacheService.getItem(cacheKey);
     if (cachedResponse) {
       return res.status(200).json(cachedResponse);
     }
