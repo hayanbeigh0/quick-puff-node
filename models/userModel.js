@@ -77,6 +77,28 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: false,
     },
+    role: {
+      type: String,
+      default: 'user',
+    },
+    photoIdUrl: {
+      type: String,
+    },
+    idVerificationStatus: {
+      type: String,
+      enum: ['pending', 'initiated', 'verified', 'rejected'], // Possible states for verification
+      default: 'pending', // Default status
+    },
+    idVerifiedBy: {
+      type: mongoose.Schema.Types.ObjectId, // Stores admin ID who verified/rejected
+      ref: 'User', // Assuming admins are also users
+    },
+    idVerificationDate: {
+      type: Date, // Stores the date of verification or rejection
+    },
+    idVerificationComment: {
+      type: String, // Optional comment left by the admin
+    },
     idVerified: {
       type: Boolean,
       required: true,

@@ -2,6 +2,7 @@ const express = require('express');
 
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
+const fileUploadController = require('../controllers/fileUploadController');
 
 const router = express.Router();
 
@@ -28,6 +29,14 @@ router
   .post(
     authController.protect,
     userController.setDefaultDeliveryAddressLocations,
+  );
+
+router
+  .route('/photoId')
+  .post(
+    authController.protect,
+    fileUploadController.handleFileUpload,
+    userController.uploadPhotoId,
   );
 
 module.exports = router;

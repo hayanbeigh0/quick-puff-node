@@ -2,6 +2,7 @@ const User = require('../models/userModel');
 
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const { uploadImage, getImageUrl } = require('../utils/cloudfs');
 
 const updateProfile = catchAsync(async (req, res, next) => {
   const { firstName, lastName, dateOfBirth, phoneNumber } = req.body;
@@ -181,6 +182,70 @@ const updateDeliveryAddressLocation = catchAsync(async (req, res, next) => {
   });
 });
 
+const uploadPhotoId = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Upload the image to Cloudinary
+  const publicId = await uploadImage(req.file, 'photoIDs');
+
+  const assetInfo = getImageUrl(publicId);
+  user.photoIdUrl = assetInfo;
+  user.idVerificationStatus = 'initiated';
+
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Photo ID uploaded, awaiting admin verification',
+  });
+});
+
+const getPendingVerifications = catchAsync(async (req, res, next) => {
+  const pendingUsers = await User.find({
+    idVerificationStatus: 'initiated',
+  }).select('firstName lastName email photoIdUrl dateOfBirth');
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      pendingUsers,
+    },
+  });
+});
+
+const verifyOrRejectPhotoId = catchAsync(async (req, res, next) => {
+  const { userId, action, comment } = req.body;
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  if (!['verify', 'reject'].includes(action)) {
+    return next(new AppError('Invalid action', 400));
+  }
+
+  user.idVerificationStatus = action === 'verify' ? 'verified' : 'rejected';
+  user.idVerified = true;
+  user.idVerifiedBy = req.user._id;
+  user.idVerificationDate = Date.now();
+  user.idVerificationComment = comment || '';
+
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: `User photo ID has been ${user.idVerificationStatus}`,
+    data: {
+      user,
+    },
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -189,4 +254,7 @@ module.exports = {
   setDefaultDeliveryAddressLocations,
   updateDeliveryAddressLocation,
   getActiveDeliveryAddressLocationOfUser,
+  uploadPhotoId,
+  getPendingVerifications,
+  verifyOrRejectPhotoId,
 };
