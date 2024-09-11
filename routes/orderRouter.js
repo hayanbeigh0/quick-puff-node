@@ -12,12 +12,11 @@ router
   .post(orderController.createOrder)
   .get(orderController.getOrders);
 
-router
-  .route('/:orderId')
-  .delete(orderController.cancelOrder);
+router.route('/myOrders').get(orderController.getOrdersOnDate);
+router.route('/orderDates').get(orderController.getOrderDates);
 
-  router
-  .route('/:id')
-  .get(orderController.getOrder)
+router.route('/:orderId').delete(orderController.cancelOrder);
+
+router.route('/:id').get(orderController.getOrder);
 
 module.exports = router;

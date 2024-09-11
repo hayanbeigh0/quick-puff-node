@@ -98,6 +98,10 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    deliveryTimeRange: {
+      type: String,
+      required: true,
+    },
     trackingNumber: String,
     status: {
       type: String,
@@ -114,6 +118,24 @@ const orderSchema = new mongoose.Schema(
     orderNotes: String,
   },
   { timestamps: true },
+  {
+    toJSON: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+      },
+    },
+  },
 );
 
 const Order = mongoose.model('Order', orderSchema);

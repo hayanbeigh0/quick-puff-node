@@ -118,11 +118,9 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     productTotalPrice += item.quantity * item.product.price;
   });
 
-  // Add the tip amount if provided
   const tipAmount = req.body.tipAmount || 0;
   productTotalPrice += tipAmount;
 
-  // 4. Ensure the order meets the minimum delivery amount
   if (productTotalPrice < MIN_DELIVERY_AMOUNT) {
     return next(
       new AppError(
@@ -132,7 +130,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     );
   }
 
-  // 5. Retrieve the user's delivery address
+  // 4. Retrieve the user's delivery address
   const deliveryAddress = user.deliveryAddressLocations.find(
     (address) => address.default === true,
   );
@@ -141,7 +139,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('Invalid delivery address', 400));
   }
 
-  // 6. Calculate the distance between the seller's location and the user's delivery address
+  // 5. Calculate the distance between the seller's location and the user's delivery address
   const distance = calculateDistance(
     {
       latitude: deliveryAddress.coordinates[1],
@@ -150,9 +148,43 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     sellerLocation,
   );
 
-  // 7. Calculate dynamic delivery and service fees based on distance
+  // 6. Calculate dynamic delivery and service fees based on distance
   const deliveryFee = DELIVERY_FEE_BASE + distance * 0.5; // Add $0.5 per km
   const serviceFee = SERVICE_FEE_BASE + (distance > 10 ? 2 : 0); // Add extra $2 if distance is > 10km
+
+  // 7. Estimate delivery time (assumed delivery speed of 40 km/h)
+  const deliverySpeedKmPerHour = 40; // Example: constant speed of 40 km/h
+  const estimatedDeliveryTimeHours = distance / deliverySpeedKmPerHour;
+
+  // Convert hours to minutes
+  const estimatedDeliveryTimeMinutes = Math.ceil(
+    estimatedDeliveryTimeHours * 60,
+  );
+
+  // Format the time range for delivery
+  const formatTimeRange = (createdAt, deliveryTimeMinutes) => {
+    const startDate = new Date(createdAt);
+    const endDate = new Date(startDate);
+    endDate.setMinutes(startDate.getMinutes() + deliveryTimeMinutes);
+
+    const formatTime = (date) => {
+      let hours = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      hours = hours % 12 || 12; // Convert to 12-hour format
+      return `${hours}:${minutes} ${ampm}`;
+    };
+
+    const startTime = formatTime(startDate);
+    const endTime = formatTime(endDate);
+
+    return `${startTime} - ${endTime}`;
+  };
+
+  const deliveryTimeRange = formatTimeRange(
+    new Date(),
+    estimatedDeliveryTimeMinutes,
+  );
 
   // 8. Apply promo code discount (if applicable)
   const promoCode = req.body.promoCode || null;
@@ -207,7 +239,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     transactionId = req.body.transactionId; // Set transaction ID for successful card payments
   }
 
-  // 12. Create the order and set all relevant fields
+  // 12. Create the order and set all relevant fields, including deliveryTimeRange
   const newOrder = await Order.create(
     [
       {
@@ -230,6 +262,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
         status: 'pending', // Initial status of the order
         statusHistory: [{ status: 'pending', changedAt: new Date() }], // Initialize status history
         orderNotes: req.body.orderNotes || '', // Optional order notes from user
+        deliveryTimeRange: deliveryTimeRange, // Store the delivery time range here
       },
     ],
     { session },
@@ -245,17 +278,99 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   // 14. Clear the cart after order creation
   await Cart.findOneAndDelete({ user: userId }).session(session);
 
-  // 15. Send response with the created order
+  // 15. Send response with the created order including deliveryTimeRange
   res.status(201).json({
     status: 'success',
     data: {
       order: newOrder,
+      deliveryTimeRange: deliveryTimeRange, // Send delivery time range in the response
     },
   });
 });
 
 const getOrders = factory.getAll(Order);
 const getOrder = factory.getOne(Order);
+
+const getOrdersOnDate = catchAsync(async (req, res, next) => {
+  const userId = req.user._id;
+  const { date } = req.body;
+
+  if (!date) {
+    return next(new AppError('Please provide a valid date', 400));
+  }
+
+  const startDate = new Date(date);
+  const endDate = new Date(date);
+  endDate.setDate(endDate.getDate() + 1); // Next day to use as the end range for the query
+
+  const orders = await Order.aggregate([
+    {
+      $match: {
+        user: userId,
+        createdAt: { $gte: startDate, $lt: endDate }, // Match orders on the specific date
+      },
+    },
+    {
+      $lookup: {
+        from: 'products',
+        localField: 'items.product',
+        foreignField: '_id',
+        as: 'productDetails',
+      },
+    },
+    {
+      $project: {
+        id: '$_id',
+        orderNumber: 1,
+        totalPrice: 1,
+        status: 1,
+        deliveryTimeRange: 1,
+        createdAt: 1,
+        items: {
+          product: { $arrayElemAt: ['$productDetails', 0] },
+          quantity: 1,
+        },
+      },
+    },
+  ]);
+
+  if (orders.length === 0) {
+    return next(new AppError('No orders found for the selected date', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    results: orders.length,
+    orders,
+  });
+});
+
+const getOrderDates = catchAsync(async (req, res, next) => {
+  const userId = req.user._id;
+
+  const orderDates = await Order.aggregate([
+    { $match: { user: userId } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, // Group by date
+      },
+    },
+    {
+      $sort: { _id: 1 }, // Sort by date in ascending order
+    },
+  ]);
+
+  const dates = orderDates.map((order) => order._id);
+
+  if (dates.length === 0) {
+    return next(new AppError('No order dates found for this user', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    dates,
+  });
+});
 
 const cancelOrder = setTransaction(async (req, res, next, session) => {
   const userId = req.user._id;
@@ -309,4 +424,6 @@ module.exports = {
   cancelOrder,
   getOrders,
   getOrder,
+  getOrderDates,
+  getOrdersOnDate,
 };
