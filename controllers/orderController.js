@@ -320,16 +320,23 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
     },
     {
       $project: {
-        id: '$_id',
+        id: '$_id', // Renaming _id to id for the order
         orderNumber: 1,
         totalPrice: 1,
         status: 1,
         deliveryTimeRange: 1,
         createdAt: 1,
         items: {
-          product: { $arrayElemAt: ['$productDetails', 0] },
-          quantity: 1,
+          product: {
+            // Select only the necessary fields from productDetails
+            id: { $arrayElemAt: ['$productDetails._id', 0] }, // Rename _id to id for product
+            name: { $arrayElemAt: ['$productDetails.name', 0] },
+            price: { $arrayElemAt: ['$productDetails.price', 0] },
+            imageUrl: { $arrayElemAt: ['$productDetails.imageUrl', 0] },
+          },
+          quantity: 1, // Keep the quantity field from items
         },
+        _id: 0,
       },
     },
   ]);
