@@ -5,6 +5,7 @@ const { nodeCacheProvider } = require('../providers/cacheProvider'); // Path to 
 const createCacheService = require('../services/cacheService'); // Path to your cache service
 const Product = require('../models/productModel');
 const ProductCategory = require('../models/productCategoryModel');
+const factory = require('./handlerFactory');
 
 // Create the cache service instance with the NodeCache provider
 const cacheService = createCacheService(nodeCacheProvider);
@@ -265,14 +266,14 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
 
   // Extract filters from query params
   const {
-    sortBy, // Sorting (e.g., "Most Relevant", "Price: Low to High")
-    deals, // Boolean for deals
-    available, // Boolean for availability
-    flavor, // Flavor ObjectId
-    maxPuff, // Maximum puff count
-    nicotineStrength, // Nicotine Strength
-    minPrice, // Minimum Price
-    maxPrice, // Maximum Price
+    sortBy,
+    deals,
+    available,
+    flavor,
+    maxPuff,
+    nicotineStrength,
+    minPrice,
+    maxPrice,
   } = req.query;
 
   // Define match filters
@@ -283,11 +284,11 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
 
   // Apply filters based on query parameters
   if (deals) {
-    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] }; // Assuming deals mean discount (oldPrice exists)
+    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] };
   }
 
   if (available) {
-    matchFilters.stock = { $gt: 0 }; // Products with stock greater than 0
+    matchFilters.stock = { $gt: 0 };
   }
 
   if (flavor) {
@@ -295,20 +296,20 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
   }
 
   if (maxPuff) {
-    matchFilters.puff = { $lte: parseInt(maxPuff, 10) }; // Puff count should be less than or equal to maxPuff
+    matchFilters.puff = { $lte: parseInt(maxPuff, 10) };
   }
 
   if (nicotineStrength) {
-    matchFilters.nicotineStrength = parseInt(nicotineStrength, 10); // Nicotine strength filter
+    matchFilters.nicotineStrength = parseInt(nicotineStrength, 10);
   }
 
   if (minPrice || maxPrice) {
     matchFilters.price = {};
     if (minPrice) {
-      matchFilters.price.$gte = parseInt(minPrice, 10); // Minimum price
+      matchFilters.price.$gte = parseInt(minPrice, 10);
     }
     if (maxPrice) {
-      matchFilters.price.$lte = parseInt(maxPrice, 10); // Maximum price
+      matchFilters.price.$lte = parseInt(maxPrice, 10);
     }
   }
 
@@ -325,25 +326,24 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
       sortOptions.price = -1;
       break;
     case 'new-arrivals':
-      sortOptions.createdAt = -1; // Sort by creation date for new arrivals
+      sortOptions.createdAt = -1;
       break;
     case 'discount':
-      sortOptions.oldPrice = -1; // Assume discount is determined by oldPrice
+      sortOptions.oldPrice = -1;
       break;
     default:
-      sortOptions.relevance = -1; // Default sorting (most relevant)
+      sortOptions.relevance = -1;
   }
 
   const products = await Product.aggregate([
     {
-      $match: matchFilters, // Apply all filters here
+      $match: matchFilters,
     },
     {
-      // Add computed field for popularityScore
       $addFields: {
         popularityScore: {
           $add: [
-            { $multiply: ['$soldCount', 0.5] }, // Adjust weights as needed
+            { $multiply: ['$soldCount', 0.5] },
             { $multiply: ['$reviewCount', 0.3] },
             { $multiply: ['$averageRating', 0.2] },
           ],
@@ -353,9 +353,9 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
     {
       $facet: {
         products: [
-          { $sort: sortOptions }, // Apply sorting options
+          { $sort: sortOptions },
           { $skip: (page - 1) * limit },
-          { $limit: limit }, // Pagination
+          { $limit: limit },
           {
             $project: {
               id: '$_id',
@@ -364,11 +364,11 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
               price: 1,
               puff: 1,
               volume: 1,
-              stock: 1, // Add stock to show availability
+              stock: 1,
               nicotineStrength: 1,
               flavor: 1,
               averageRating: 1,
-              hasDeal: { $gt: ['$oldPrice', '$price'] }, // Check for deal status
+              hasDeal: { $gt: ['$oldPrice', '$price'] },
               _id: 0,
             },
           },
@@ -376,44 +376,21 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
         totalCount: [{ $count: 'count' }],
       },
     },
-    {
-      $addFields: {
-        remainingItems: {
-          $let: {
-            vars: {
-              totalItems: { $arrayElemAt: ['$totalCount.count', 0] },
-            },
-            in: { $max: [{ $subtract: ['$$totalItems', limit] }, 0] },
-          },
-        },
-      },
-    },
-    {
-      $project: {
-        totalCount: 0,
-      },
-    },
-    {
-      $replaceRoot: {
-        newRoot: {
-          productsByBrandAndCategory: {
-            products: '$products',
-            remainingItems: '$remainingItems',
-          },
-        },
-      },
-    },
   ]);
 
-  res.status(200).json(
-    { status: 'success', ...products[0] } || {
-      productsByBrandAndCategory: {
-        status: 'success',
-        products: [],
-        remainingItems: 0,
-      },
+  const totalCount = products[0].totalCount[0]?.count || 0;
+  const totalPages = Math.ceil(totalCount / limit);
+
+  res.status(200).json({
+    status: 'success',
+    products: products[0].products || [],
+    pageInfo: {
+      page,
+      limit,
+      totalPages,
+      totalItems: totalCount,
     },
-  );
+  });
 });
 
 const getTotalProductsCountByBrandAndCategory = catchAsync(
@@ -486,8 +463,134 @@ const getTotalProductsCountByBrandAndCategory = catchAsync(
   },
 );
 
+const getBrandsByProductCategory = catchAsync(async (req, res, next) => {
+  const { productCategoryId } = req.params;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 10;
+
+  const cacheKey = `brands-${productCategoryId}-page-${page}-limit-${limit}`;
+
+  // Try to get the cached response
+  let cachedResponse;
+  // const cachedResponse = await cacheService.getItem(cacheKey);
+  if (cachedResponse) {
+    return res.status(200).json(cachedResponse);
+  }
+
+  const productCategoryIdObj = mongoose.Types.ObjectId(productCategoryId);
+
+  // Fetch paginated brands based on product category
+  const brands = await ProductCategory.aggregate([
+    {
+      $match: {
+        _id: productCategoryIdObj,
+      },
+    },
+    {
+      $lookup: {
+        from: 'brandcategories',
+        localField: '_id',
+        foreignField: 'productCategories',
+        as: 'matchedBrandCategories',
+      },
+    },
+    {
+      $unwind: '$matchedBrandCategories',
+    },
+    {
+      $lookup: {
+        from: 'brands',
+        localField: 'matchedBrandCategories._id',
+        foreignField: 'categories',
+        as: 'brandsSellingCategory',
+      },
+    },
+    {
+      $unwind: '$brandsSellingCategory',
+    },
+    {
+      $group: {
+        _id: '$brandsSellingCategory._id',
+        name: { $first: '$brandsSellingCategory.name' },
+      },
+    },
+    {
+      $sort: { name: 1 }, // Sort by brand name
+    },
+    {
+      $skip: (page - 1) * limit,
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+      },
+    },
+  ]);
+
+  const totalBrands = await ProductCategory.aggregate([
+    {
+      $match: { _id: productCategoryIdObj },
+    },
+    {
+      $lookup: {
+        from: 'brandcategories',
+        localField: '_id',
+        foreignField: 'productCategories',
+        as: 'matchedBrandCategories',
+      },
+    },
+    {
+      $unwind: '$matchedBrandCategories',
+    },
+    {
+      $lookup: {
+        from: 'brands',
+        localField: 'matchedBrandCategories._id',
+        foreignField: 'categories',
+        as: 'brandsSellingCategory',
+      },
+    },
+    {
+      $unwind: '$brandsSellingCategory',
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const totalItems = totalBrands.length > 0 ? totalBrands[0].total : 0;
+
+  const pageInfo = {
+    page,
+    limit,
+    totalPages: Math.ceil(totalItems / limit),
+    totalItems,
+  };
+
+  const response = {
+    brands: brands.map((brand) => ({
+      id: brand._id,
+      name: brand.name,
+    })),
+    pageInfo,
+  };
+
+  await cacheService.save(cacheKey, response, 600);
+
+  // Final response
+  return res.status(200).json({ status: 'success', ...response });
+});
+
 module.exports = {
   getBrandsAndProductsByBrandCategory,
   getProductsByBrandAndCategory,
   getTotalProductsCountByBrandAndCategory,
+  getBrandsByProductCategory,
 };

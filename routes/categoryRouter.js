@@ -9,6 +9,12 @@ router.route('/:productCategoryId').get(
   authController.protect, // Ensure the user is authenticated
   categoryController.getBrandsAndProductsByBrandCategory, // Create the product
 );
+
+router.route('/:productCategoryId/brands').get(
+  authController.protect, // Ensure the user is authenticated
+  categoryController.getBrandsByProductCategory, // Create the product
+);
+
 router.route('/:brandId/:productCategoryId').get(
   authController.protect, // Ensure the user is authenticated
   categoryController.getProductsByBrandAndCategory, // Create the product
