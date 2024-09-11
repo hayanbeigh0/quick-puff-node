@@ -223,6 +223,72 @@ const getSearchSuggestions = catchAsync(async (req, res, next) => {
   });
 });
 
+const getPopularProducts = catchAsync(async (req, res, next) => {
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 10;
+
+  // Step 1: Fetch products and calculate popularityScore
+  const popularProducts = await Product.aggregate([
+    {
+      $addFields: {
+        popularityScore: {
+          $add: [
+            { $multiply: ['$soldCount', 0.5] },
+            { $multiply: ['$reviewCount', 0.3] },
+            { $multiply: ['$averageRating', 0.2] },
+          ],
+        },
+      },
+    },
+    {
+      $sort: { popularityScore: -1 }, // Sort by popularity score in descending order
+    },
+    {
+      $skip: (page - 1) * limit, // Pagination logic
+    },
+    {
+      $limit: limit, // Limit the number of results
+    },
+    {
+      $project: {
+        id: '$_id',
+        name: 1,
+        image: 1,
+        price: 1,
+        puff: 1,
+        volume: 1,
+        stock: 1,
+        nicotineStrength: 1,
+        flavor: 1,
+        averageRating: 1,
+        soldCount: 1,
+        reviewCount: 1,
+        popularityScore: 1,
+        hasDeal: { $gt: ['$oldPrice', '$price'] }, // Determine if the product has a deal
+        _id: 0,
+      },
+    },
+  ]);
+
+  // Step 2: Get the total count for pagination
+  const totalCount = await Product.countDocuments();
+
+  // Calculate total pages
+  const totalPages = Math.ceil(totalCount / limit);
+
+  // Step 3: Return the response
+  res.status(200).json({
+    status: 'success',
+    products: popularProducts,
+    pageInfo: {
+      page,
+      limit,
+      totalPages,
+      totalItems: totalCount,
+    },
+  });
+});
+
 const getProducts = factory.getAll(Product);
 
 // Export middleware and controller functions
@@ -233,4 +299,5 @@ module.exports = {
   updateProduct,
   searchProducts,
   getSearchSuggestions,
+  getPopularProducts,
 };

@@ -28,5 +28,8 @@ router
 router
   .route('/search/suggestions')
   .get(authController.protect, productController.getSearchSuggestions);
+router
+  .route('/popularProducts')
+  .get(authController.protect, productController.getPopularProducts);
 
 module.exports = router;
