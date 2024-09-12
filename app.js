@@ -73,6 +73,10 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/', (req, res) => {
+  res.send('Server has started!');
+});
+
 app.use('/api/v1/', router);
 
 app.all('*', (req, res, next) => {
