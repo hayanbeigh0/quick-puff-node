@@ -17,6 +17,9 @@ const adminRouter = require('./adminRouter');
 
 const router = express.Router();
 
+router.route('/').get((req, res) => {
+  res.send('Server has started!');
+});
 router.use('/users', userRouter);
 router.use('/auth', authRouter);
 router.use('/product', productRouter);
