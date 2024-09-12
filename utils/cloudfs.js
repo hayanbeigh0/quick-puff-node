@@ -80,10 +80,6 @@ const extractPublicIdFromUrl = (imageUrl) => {
 };
 
 module.exports = {
-  extractPublicIdFromUrl,
-};
-
-module.exports = {
   uploadImage,
   getAssetInfo,
   createImageTag,
