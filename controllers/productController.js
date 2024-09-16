@@ -416,119 +416,44 @@ const getProductFilter = catchAsync(async (req, res, next) => {
 
         // Predefined nicotine strength options with exact match counts
         nicotineStrength: [
-          // First, count products grouped by nicotineStrength and usingSaltNicotine
+          {
+            $match: {
+              nicotineStrength: {
+                $in: [3, 6, 9, 12, 30, 50],
+              },
+            },
+          },
+          {
+            $project: {
+              nicotineStrength: 1,
+              usingSaltNicotine: {
+                $cond: {
+                  if: {
+                    $in: ['$nicotineStrength', [30, 50]],
+                  },
+                  then: true,
+                  else: false,
+                },
+              },
+            },
+          },
           {
             $group: {
               _id: {
                 nicotineStrength: '$nicotineStrength',
                 usingSaltNicotine: '$usingSaltNicotine',
               },
-              count: { $sum: 1 },
+              count: {
+                $sum: 1,
+              },
             },
           },
           {
             $project: {
               nicotineStrength: '$_id.nicotineStrength',
-              count: 1,
               usingSaltNicotine: '$_id.usingSaltNicotine',
+              count: 1,
               _id: 0,
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              data: {
-                $push: {
-                  nicotineStrength: '$nicotineStrength',
-                  count: '$count',
-                  usingSaltNicotine: '$usingSaltNicotine',
-                },
-              },
-            },
-          },
-          {
-            $addFields: {
-              predefinedNicotineStrengths: predefinedNicotineStrengths.map(
-                (strength) => ({
-                  nicotineStrength: strength,
-                  count: 0,
-                  usingSaltNicotine:
-                    strength === 30 || strength === 50 ? true : false, // Default to true for 30/50mg
-                }),
-              ),
-            },
-          },
-          {
-            $project: {
-              nicotineStrength: {
-                $map: {
-                  input: '$predefinedNicotineStrengths',
-                  as: 'strengthValue',
-                  in: {
-                    nicotineStrength: '$$strengthValue.nicotineStrength',
-                    count: {
-                      $cond: {
-                        if: {
-                          $in: [
-                            '$$strengthValue.nicotineStrength',
-                            ['$data.nicotineStrength'],
-                          ],
-                        },
-                        then: {
-                          $cond: {
-                            if: {
-                              $and: [
-                                {
-                                  $in: [
-                                    '$$strengthValue.nicotineStrength',
-                                    [30, 50],
-                                  ],
-                                }, // Check if nicotine strength is 30 or 50
-                                { $eq: ['$data.usingSaltNicotine', true] }, // Ensure usingSaltNicotine is true
-                              ],
-                            },
-                            then: {
-                              $arrayElemAt: [
-                                '$data.count',
-                                {
-                                  $indexOfArray: [
-                                    '$data.nicotineStrength',
-                                    '$$strengthValue.nicotineStrength',
-                                  ],
-                                },
-                              ],
-                            },
-                            else: 0,
-                          },
-                        },
-                        else: {
-                          $cond: {
-                            if: {
-                              $in: [
-                                '$$strengthValue.nicotineStrength',
-                                ['$data.nicotineStrength'],
-                              ],
-                            },
-                            then: {
-                              $arrayElemAt: [
-                                '$data.count',
-                                {
-                                  $indexOfArray: [
-                                    '$data.nicotineStrength',
-                                    '$$strengthValue.nicotineStrength',
-                                  ],
-                                },
-                              ],
-                            },
-                            else: 0,
-                          },
-                        },
-                      },
-                    },
-                    usingSaltNicotine: '$$strengthValue.usingSaltNicotine',
-                  },
-                },
-              },
             },
           },
         ],
@@ -541,7 +466,7 @@ const getProductFilter = catchAsync(async (req, res, next) => {
     filters: {
       flavor: filters[0].flavors,
       maxPuffs: filters[0].maxPuffs[0].puffs,
-      nicotineStrength: filters[0].nicotineStrength[0].nicotineStrength,
+      nicotineStrength: filters[0].nicotineStrength,
     },
   });
 });
