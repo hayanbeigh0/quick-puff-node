@@ -1,6 +1,7 @@
 const Product = require('../models/productModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const mongoose = require('mongoose');
 const factory = require('./handlerFactory');
 const {
   uploadImage,
@@ -293,10 +294,18 @@ const getProductFilter = catchAsync(async (req, res, next) => {
   const predefinedPuffs = [2500, 5000, 6000, 6500, 7000];
   const predefinedNicotineStrengths = [3, 6, 9, 12, 30, 50];
 
+  const { brandId, categoryId } = req.params; // Get brandId and categoryId from req.params
+
   const filters = await Product.aggregate([
     {
+      $match: {
+        brand: mongoose.Types.ObjectId(brandId), // Filter by brand
+        productCategory: mongoose.Types.ObjectId(categoryId), // Filter by product category
+      },
+    },
+    {
       $facet: {
-        // Flavors: Fetch all flavors, count products for each flavor, and return the flavor _id as well
+        // Flavors
         flavors: [
           {
             $lookup: {
@@ -314,15 +323,15 @@ const getProductFilter = catchAsync(async (req, res, next) => {
           },
           {
             $group: {
-              _id: '$flavorDetails._id', // Group by flavor _id
-              name: { $first: '$flavorDetails.name' }, // Get the flavor name
-              count: { $sum: 1 }, // Count number of products for this flavor
+              _id: '$flavorDetails._id',
+              name: { $first: '$flavorDetails.name' },
+              count: { $sum: 1 },
             },
           },
           {
             $lookup: {
               from: 'flavors',
-              pipeline: [{ $project: { name: 1 } }], // Fetch all flavors
+              pipeline: [{ $project: { name: 1 } }],
               as: 'allFlavors',
             },
           },
@@ -331,40 +340,40 @@ const getProductFilter = catchAsync(async (req, res, next) => {
           },
           {
             $project: {
-              _id: '$allFlavors._id', // Return the flavor ID
-              name: '$allFlavors.name', // Return the flavor name
+              _id: '$allFlavors._id',
+              name: '$allFlavors.name',
               count: {
-                $cond: [{ $eq: ['$allFlavors._id', '$_id'] }, '$count', 0], // Set count or 0
+                $cond: [{ $eq: ['$allFlavors._id', '$_id'] }, '$count', 0],
               },
             },
           },
           {
             $group: {
-              _id: { id: '$_id', name: '$name' }, // Group by both ID and name
-              count: { $max: '$count' }, // Max count to avoid duplicates
+              _id: { id: '$_id', name: '$name' },
+              count: { $max: '$count' },
             },
           },
           {
             $project: {
               _id: 0,
-              id: '$_id.id', // Flavor ID
-              name: '$_id.name', // Flavor name
-              count: 1, // Count
+              id: '$_id.id',
+              name: '$_id.name',
+              count: 1,
             },
           },
         ],
 
-        // Predefined puff options with exact match counts
+        // Predefined puff options
         maxPuffs: [
           {
             $group: {
-              _id: '$puff', // Group by puff value
-              count: { $sum: 1 }, // Count products with that puff value
+              _id: '$puff',
+              count: { $sum: 1 },
             },
           },
           {
             $project: {
-              puff: '$_id', // Rename _id to puff
+              puff: '$_id',
               count: 1,
               _id: 0,
             },
@@ -393,15 +402,11 @@ const getProductFilter = catchAsync(async (req, res, next) => {
                     puff: '$$puffValue',
                     count: {
                       $cond: {
-                        if: {
-                          $in: ['$$puffValue', '$data.puff'],
-                        },
+                        if: { $in: ['$$puffValue', '$data.puff'] },
                         then: {
                           $arrayElemAt: [
                             '$data.count',
-                            {
-                              $indexOfArray: ['$data.puff', '$$puffValue'],
-                            },
+                            { $indexOfArray: ['$data.puff', '$$puffValue'] },
                           ],
                         },
                         else: 0,
@@ -414,13 +419,11 @@ const getProductFilter = catchAsync(async (req, res, next) => {
           },
         ],
 
-        // Predefined nicotine strength options with exact match counts
+        // Predefined nicotine strength options
         nicotineStrength: [
           {
             $match: {
-              nicotineStrength: {
-                $in: [3, 6, 9, 12, 30, 50],
-              },
+              nicotineStrength: { $in: [3, 6, 9, 12, 30, 50] },
             },
           },
           {
@@ -428,9 +431,7 @@ const getProductFilter = catchAsync(async (req, res, next) => {
               nicotineStrength: 1,
               usingSaltNicotine: {
                 $cond: {
-                  if: {
-                    $in: ['$nicotineStrength', [30, 50]],
-                  },
+                  if: { $in: ['$nicotineStrength', [30, 50]] },
                   then: true,
                   else: false,
                 },
@@ -443,9 +444,7 @@ const getProductFilter = catchAsync(async (req, res, next) => {
                 nicotineStrength: '$nicotineStrength',
                 usingSaltNicotine: '$usingSaltNicotine',
               },
-              count: {
-                $sum: 1,
-              },
+              count: { $sum: 1 },
             },
           },
           {

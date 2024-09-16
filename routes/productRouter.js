@@ -32,7 +32,7 @@ router
   .route('/popularProducts')
   .get(authController.protect, productController.getPopularProducts);
 router
-  .route('/filters')
+  .route('/filters/:brandId/:categoryId')
   .get(authController.protect, productController.getProductFilter);
 
 module.exports = router;
