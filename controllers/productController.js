@@ -289,6 +289,214 @@ const getPopularProducts = catchAsync(async (req, res, next) => {
   });
 });
 
+const getProductFilter = catchAsync(async (req, res, next) => {
+  const predefinedPuffs = [2500, 5000, 6000, 6500, 7000];
+  const predefinedNicotineStrengths = [3, 6, 9, 12, 30, 50];
+
+  const filters = await Product.aggregate([
+    {
+      $facet: {
+        // Flavors: Fetch all flavors, count products for each flavor, and return the flavor _id as well
+        flavors: [
+          {
+            $lookup: {
+              from: 'flavors',
+              localField: 'flavor',
+              foreignField: '_id',
+              as: 'flavorDetails',
+            },
+          },
+          {
+            $unwind: {
+              path: '$flavorDetails',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $group: {
+              _id: '$flavorDetails._id', // Group by flavor _id
+              name: { $first: '$flavorDetails.name' }, // Get the flavor name
+              count: { $sum: 1 }, // Count number of products for this flavor
+            },
+          },
+          {
+            $lookup: {
+              from: 'flavors',
+              pipeline: [{ $project: { name: 1 } }], // Fetch all flavors
+              as: 'allFlavors',
+            },
+          },
+          {
+            $unwind: '$allFlavors',
+          },
+          {
+            $project: {
+              _id: '$allFlavors._id', // Return the flavor ID
+              name: '$allFlavors.name', // Return the flavor name
+              count: {
+                $cond: [{ $eq: ['$allFlavors._id', '$_id'] }, '$count', 0], // Set count or 0
+              },
+            },
+          },
+          {
+            $group: {
+              _id: { id: '$_id', name: '$name' }, // Group by both ID and name
+              count: { $max: '$count' }, // Max count to avoid duplicates
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              id: '$_id.id', // Flavor ID
+              name: '$_id.name', // Flavor name
+              count: 1, // Count
+            },
+          },
+        ],
+
+        // Predefined puff options with exact match counts
+        maxPuffs: [
+          {
+            $group: {
+              _id: '$puff', // Group by puff value
+              count: { $sum: 1 }, // Count products with that puff value
+            },
+          },
+          {
+            $project: {
+              puff: '$_id', // Rename _id to puff
+              count: 1,
+              _id: 0,
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              data: { $push: { puff: '$puff', count: '$count' } },
+            },
+          },
+          {
+            $addFields: {
+              predefinedPuffs: predefinedPuffs.map((puff) => ({
+                puff,
+                count: 0,
+              })),
+            },
+          },
+          {
+            $project: {
+              puffs: {
+                $map: {
+                  input: predefinedPuffs,
+                  as: 'puffValue',
+                  in: {
+                    puff: '$$puffValue',
+                    count: {
+                      $cond: {
+                        if: {
+                          $in: ['$$puffValue', '$data.puff'],
+                        },
+                        then: {
+                          $arrayElemAt: [
+                            '$data.count',
+                            {
+                              $indexOfArray: ['$data.puff', '$$puffValue'],
+                            },
+                          ],
+                        },
+                        else: 0,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+
+        // Predefined nicotine strength options with exact match counts
+        nicotineStrength: [
+          {
+            $group: {
+              _id: '$nicotineStrength', // Group by nicotine strength value
+              count: { $sum: 1 }, // Count products with that nicotine strength value
+            },
+          },
+          {
+            $project: {
+              nicotineStrength: '$_id', // Rename _id to nicotineStrength
+              count: 1,
+              _id: 0,
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              data: {
+                $push: {
+                  nicotineStrength: '$nicotineStrength',
+                  count: '$count',
+                },
+              },
+            },
+          },
+          {
+            $addFields: {
+              predefinedNicotineStrengths: predefinedNicotineStrengths.map(
+                (strength) => ({
+                  nicotineStrength: strength,
+                  count: 0,
+                }),
+              ),
+            },
+          },
+          {
+            $project: {
+              nicotineStrength: {
+                $map: {
+                  input: predefinedNicotineStrengths,
+                  as: 'strengthValue',
+                  in: {
+                    nicotineStrength: '$$strengthValue',
+                    count: {
+                      $cond: {
+                        if: {
+                          $in: ['$$strengthValue', '$data.nicotineStrength'],
+                        },
+                        then: {
+                          $arrayElemAt: [
+                            '$data.count',
+                            {
+                              $indexOfArray: [
+                                '$data.nicotineStrength',
+                                '$$strengthValue',
+                              ],
+                            },
+                          ],
+                        },
+                        else: 0,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  res.status(200).json({
+    status: 'success',
+    filters: {
+      flavor: filters[0].flavors,
+      maxPuffs: filters[0].maxPuffs[0].puffs,
+      nicotineStrength: filters[0].nicotineStrength[0].nicotineStrength,
+    },
+  });
+});
+
 const getProducts = factory.getAll(Product);
 
 // Export middleware and controller functions
@@ -300,4 +508,5 @@ module.exports = {
   searchProducts,
   getSearchSuggestions,
   getPopularProducts,
+  getProductFilter,
 };

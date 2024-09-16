@@ -31,5 +31,8 @@ router
 router
   .route('/popularProducts')
   .get(authController.protect, productController.getPopularProducts);
+router
+  .route('/filters')
+  .get(authController.protect, productController.getProductFilter);
 
 module.exports = router;
