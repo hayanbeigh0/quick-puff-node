@@ -65,6 +65,11 @@ const productSchema = new mongoose.Schema(
       default: 0,
       required: true,
     },
+    usingSaltNicotine: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     flavor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Flavor',

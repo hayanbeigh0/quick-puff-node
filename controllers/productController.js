@@ -416,16 +416,21 @@ const getProductFilter = catchAsync(async (req, res, next) => {
 
         // Predefined nicotine strength options with exact match counts
         nicotineStrength: [
+          // First, count products grouped by nicotineStrength and usingSaltNicotine
           {
             $group: {
-              _id: '$nicotineStrength', // Group by nicotine strength value
-              count: { $sum: 1 }, // Count products with that nicotine strength value
+              _id: {
+                nicotineStrength: '$nicotineStrength',
+                usingSaltNicotine: '$usingSaltNicotine',
+              },
+              count: { $sum: 1 },
             },
           },
           {
             $project: {
-              nicotineStrength: '$_id', // Rename _id to nicotineStrength
+              nicotineStrength: '$_id.nicotineStrength',
               count: 1,
+              usingSaltNicotine: '$_id.usingSaltNicotine',
               _id: 0,
             },
           },
@@ -436,6 +441,7 @@ const getProductFilter = catchAsync(async (req, res, next) => {
                 $push: {
                   nicotineStrength: '$nicotineStrength',
                   count: '$count',
+                  usingSaltNicotine: '$usingSaltNicotine',
                 },
               },
             },
@@ -446,6 +452,8 @@ const getProductFilter = catchAsync(async (req, res, next) => {
                 (strength) => ({
                   nicotineStrength: strength,
                   count: 0,
+                  usingSaltNicotine:
+                    strength === 30 || strength === 50 ? true : false, // Default to true for 30/50mg
                 }),
               ),
             },
@@ -454,29 +462,70 @@ const getProductFilter = catchAsync(async (req, res, next) => {
             $project: {
               nicotineStrength: {
                 $map: {
-                  input: predefinedNicotineStrengths,
+                  input: '$predefinedNicotineStrengths',
                   as: 'strengthValue',
                   in: {
-                    nicotineStrength: '$$strengthValue',
+                    nicotineStrength: '$$strengthValue.nicotineStrength',
                     count: {
                       $cond: {
                         if: {
-                          $in: ['$$strengthValue', '$data.nicotineStrength'],
-                        },
-                        then: {
-                          $arrayElemAt: [
-                            '$data.count',
-                            {
-                              $indexOfArray: [
-                                '$data.nicotineStrength',
-                                '$$strengthValue',
-                              ],
-                            },
+                          $in: [
+                            '$$strengthValue.nicotineStrength',
+                            ['$data.nicotineStrength'],
                           ],
                         },
-                        else: 0,
+                        then: {
+                          $cond: {
+                            if: {
+                              $and: [
+                                {
+                                  $in: [
+                                    '$$strengthValue.nicotineStrength',
+                                    [30, 50],
+                                  ],
+                                }, // Check if nicotine strength is 30 or 50
+                                { $eq: ['$data.usingSaltNicotine', true] }, // Ensure usingSaltNicotine is true
+                              ],
+                            },
+                            then: {
+                              $arrayElemAt: [
+                                '$data.count',
+                                {
+                                  $indexOfArray: [
+                                    '$data.nicotineStrength',
+                                    '$$strengthValue.nicotineStrength',
+                                  ],
+                                },
+                              ],
+                            },
+                            else: 0,
+                          },
+                        },
+                        else: {
+                          $cond: {
+                            if: {
+                              $in: [
+                                '$$strengthValue.nicotineStrength',
+                                ['$data.nicotineStrength'],
+                              ],
+                            },
+                            then: {
+                              $arrayElemAt: [
+                                '$data.count',
+                                {
+                                  $indexOfArray: [
+                                    '$data.nicotineStrength',
+                                    '$$strengthValue.nicotineStrength',
+                                  ],
+                                },
+                              ],
+                            },
+                            else: 0,
+                          },
+                        },
                       },
                     },
+                    usingSaltNicotine: '$$strengthValue.usingSaltNicotine',
                   },
                 },
               },
