@@ -1,12 +1,9 @@
-const Brand = require('../models/brandModel');
 const catchAsync = require('../utils/catchAsync');
 const mongoose = require('mongoose');
 const { nodeCacheProvider } = require('../providers/cacheProvider'); // Path to your NodeCache provider
 const createCacheService = require('../services/cacheService'); // Path to your cache service
 const Product = require('../models/productModel');
 const ProductCategory = require('../models/productCategoryModel');
-const factory = require('./handlerFactory');
-
 // Create the cache service instance with the NodeCache provider
 const cacheService = createCacheService(nodeCacheProvider);
 
