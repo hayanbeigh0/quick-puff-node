@@ -281,15 +281,25 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   // 15. Send response with the created order including deliveryTimeRange
   res.status(201).json({
     status: 'success',
-    data: {
-      order: newOrder,
-      deliveryTimeRange: deliveryTimeRange, // Send delivery time range in the response
-    },
+    orders: newOrder,
+    deliveryTimeRange: deliveryTimeRange, // Send delivery time range in the response
   });
 });
 
 const getOrders = factory.getAll(Order);
-const getOrder = factory.getOne(Order);
+const getOrder = catchAsync(async (req, res, next) => {
+  let query = Order.findById(req.params.id);
+  let order = await query;
+
+  if (!order) {
+    return next(new AppError('No order found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    order,
+  });
+});
 
 const getOrdersOnDate = catchAsync(async (req, res, next) => {
   const userId = req.user._id;

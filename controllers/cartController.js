@@ -54,9 +54,7 @@ const addItemToCart = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    data: {
-      cart,
-    },
+    cart,
   });
 });
 
@@ -72,20 +70,16 @@ const getCart = catchAsync(async (req, res, next) => {
   if (!cart) {
     return res.status(200).json({
       status: 'success',
-      data: {
-        cart: {
-          items: [],
-          totalPrice: 0,
-        },
+      cart: {
+        items: [],
+        totalPrice: 0,
       },
     });
   }
 
   res.status(200).json({
     status: 'success',
-    data: {
-      cart,
-    },
+    cart,
   });
 });
 
@@ -108,9 +102,7 @@ const removeItemFromCart = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    data: {
-      cart,
-    },
+    cart,
   });
 });
 
@@ -156,9 +148,7 @@ const updateCartItemQuantity = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: 'success',
-    data: {
-      cart,
-    },
+    cart,
   });
 });
 

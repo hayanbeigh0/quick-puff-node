@@ -26,22 +26,60 @@ const cartSchema = new mongoose.Schema(
       default: 0,
     },
   },
-  { timestamps: true },
   {
-    _id: true, // Ensure _id is created for each subdocument
-    id: true, // Create a virtual 'id' field from '_id'
+    timestamps: true,
     toJSON: {
       virtuals: true,
       transform: function (doc, ret) {
+        // Replace _id with id at the top level
         ret.id = ret._id;
         delete ret._id;
+
+        // Transform each item in the items array to replace _id with id
+        if (ret.items) {
+          ret.items = ret.items.map((item) => {
+            item.id = item._id;
+            delete item._id;
+            return item;
+          });
+        }
+
+        // If products in items have _id, replace them with id too
+        if (ret.items && ret.items.length > 0) {
+          ret.items.forEach((item) => {
+            if (item.product && item.product._id) {
+              item.product.id = item.product._id;
+              delete item.product._id;
+            }
+          });
+        }
       },
     },
     toObject: {
       virtuals: true,
       transform: function (doc, ret) {
+        // Replace _id with id at the top level
         ret.id = ret._id;
         delete ret._id;
+
+        // Transform each item in the items array to replace _id with id
+        if (ret.items) {
+          ret.items = ret.items.map((item) => {
+            item.id = item._id;
+            delete item._id;
+            return item;
+          });
+        }
+
+        // If products in items have _id, replace them with id too
+        if (ret.items && ret.items.length > 0) {
+          ret.items.forEach((item) => {
+            if (item.product && item.product._id) {
+              item.product.id = item.product._id;
+              delete item.product._id;
+            }
+          });
+        }
       },
     },
   },

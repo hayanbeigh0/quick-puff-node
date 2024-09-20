@@ -42,4 +42,4 @@ brandSchema.index({ categories: 1 });
 
 const Brand = mongoose.model('Brand', brandSchema);
 
-module.exports = Brand;
+module.exports = Brand
