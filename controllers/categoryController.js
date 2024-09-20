@@ -146,6 +146,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             price: '$productsForBrand.price',
             puff: '$productsForBrand.puff',
             volume: '$productsForBrand.volume',
+            stock: '$productsForBrand.stock',
           },
         },
       },
@@ -218,6 +219,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             price: product.price,
             puff: product.puff,
             volume: product.volume,
+            stock: product.stock,
           })),
           remainingItems, // Remaining products count
         };
