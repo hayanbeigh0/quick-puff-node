@@ -117,14 +117,23 @@ const orderSchema = new mongoose.Schema(
     deliveredAt: Date,
     orderNotes: String,
   },
-  { timestamps: true },
   {
+    timestamps: true,
     toJSON: {
       virtuals: true,
       transform: function (doc, ret) {
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+
+        // Transform _id to id in items array
+        if (ret.items && Array.isArray(ret.items)) {
+          ret.items = ret.items.map((item) => ({
+            ...item,
+            id: item._id,
+            _id: undefined,
+          }));
+        }
       },
     },
     toObject: {
@@ -133,6 +142,15 @@ const orderSchema = new mongoose.Schema(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+
+        // Transform _id to id in items array
+        if (ret.items && Array.isArray(ret.items)) {
+          ret.items = ret.items.map((item) => ({
+            ...item,
+            id: item._id,
+            _id: undefined,
+          }));
+        }
       },
     },
   },
