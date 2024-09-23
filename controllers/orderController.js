@@ -339,21 +339,27 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
     },
     {
       $project: {
-        id: '$_id', // Renaming _id to id for the order
+        id: '$_id', // Rename _id to id for the order
         orderNumber: 1,
         totalPrice: 1,
         status: 1,
         deliveryTimeRange: 1,
         createdAt: 1,
         items: {
-          product: {
-            // Select only the necessary fields from productDetails
-            id: { $arrayElemAt: ['$productDetails._id', 0] }, // Rename _id to id for product
-            name: { $arrayElemAt: ['$productDetails.name', 0] },
-            price: { $arrayElemAt: ['$productDetails.price', 0] },
-            image: { $arrayElemAt: ['$productDetails.image', 0] },
+          $map: {
+            input: '$items',
+            as: 'item',
+            in: {
+              id: '$$item._id', // Assuming each item has its own _id
+              product: {
+                id: { $arrayElemAt: ['$productDetails._id', 0] }, // Rename _id to id for product
+                name: { $arrayElemAt: ['$productDetails.name', 0] },
+                price: { $arrayElemAt: ['$productDetails.price', 0] },
+                image: { $arrayElemAt: ['$productDetails.image', 0] },
+              },
+              quantity: '$$item.quantity', // Keep the quantity field from each item
+            },
           },
-          quantity: 1, // Keep the quantity field from items
         },
         _id: 0,
       },
@@ -444,6 +450,8 @@ const cancelOrder = setTransaction(async (req, res, next, session) => {
     },
   });
 });
+
+const getOrderLocation = setTransaction(async (req, res, next, session) => {});
 
 module.exports = {
   createOrder,
