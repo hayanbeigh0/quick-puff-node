@@ -289,12 +289,21 @@ const createOrder = setTransaction(async (req, res, next, session) => {
 const getOrders = factory.getAll(Order);
 const getOrder = catchAsync(async (req, res, next) => {
   let query = Order.findById(req.params.id);
+
+  // Use 'populate' with 'select' to get specific fields from 'product'
+  query.populate({
+    path: 'items.product',
+    select: 'name price image', // Specify the fields you want to include
+  });
+
   let order = await query;
 
+  // Handle case if no order is found
   if (!order) {
     return next(new AppError('No order found with that ID', 404));
   }
 
+  // Send response with the populated order
   res.status(200).json({
     status: 'success',
     order,
