@@ -342,7 +342,7 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
             id: { $arrayElemAt: ['$productDetails._id', 0] }, // Rename _id to id for product
             name: { $arrayElemAt: ['$productDetails.name', 0] },
             price: { $arrayElemAt: ['$productDetails.price', 0] },
-            imageUrl: { $arrayElemAt: ['$productDetails.imageUrl', 0] },
+            image: { $arrayElemAt: ['$productDetails.image', 0] },
           },
           quantity: 1, // Keep the quantity field from items
         },
