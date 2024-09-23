@@ -134,6 +134,13 @@ const orderSchema = new mongoose.Schema(
             _id: undefined,
           }));
         }
+        if (ret.statusHistory && Array.isArray(ret.statusHistory)) {
+          ret.statusHistory = ret.statusHistory.map((item) => ({
+            ...item,
+            id: item._id,
+            _id: undefined,
+          }));
+        }
       },
     },
     toObject: {
@@ -146,6 +153,13 @@ const orderSchema = new mongoose.Schema(
         // Transform _id to id in items array
         if (ret.items && Array.isArray(ret.items)) {
           ret.items = ret.items.map((item) => ({
+            ...item,
+            id: item._id,
+            _id: undefined,
+          }));
+        }
+        if (ret.statusHistory && Array.isArray(ret.statusHistory)) {
+          ret.statusHistory = ret.statusHistory.map((item) => ({
             ...item,
             id: item._id,
             _id: undefined,
