@@ -57,7 +57,7 @@ const mountSetDeliveryLocationEvent = async (socket) => {
       if (!orderId || !newLocation)
         throw { message: 'Missing required fields: orderId, newLocation' };
 
-      if (!socket.user.role === 'DELIVERY-PARTNER')
+      if (!socket.user.role === 'delivery-partner')
         throw {
           message: `You are not authorised to update delivery partner's location`,
         };
