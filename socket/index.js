@@ -6,7 +6,7 @@ const User = require('../models/userModel');
 const Order = require('../models/orderModel');
 
 const mountBuyerJoinOrderEvent = async (socket) => {
-  socket.on('joinOrder', async (orderId) => {
+  socket.on('joinBuyerOrder', async (orderId) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(orderId))
         throw { message: 'Invalid orderId' };
@@ -25,6 +25,54 @@ const mountBuyerJoinOrderEvent = async (socket) => {
         'error',
         error?.message ||
           'Something went wrong while connecting to the socket.',
+      );
+    }
+  });
+};
+
+const mountDeliveryJoinOrderEvent = async (socket) => {
+  socket.on('joinDeliveryOrder', async (orderId) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(orderId))
+        throw { message: 'Invalid orderId' };
+
+      const order = await Order.findById(orderId);
+      if (!order) throw { message: 'No order found with that id' };
+
+      socket.join(orderId);
+    } catch (error) {
+      socket.emit(
+        'error',
+        error?.message || 'Something went wrong while joining the room',
+      );
+    }
+  });
+};
+
+const mountSetDeliveryLocationEvent = async (socket) => {
+  socket.on('setDeliveryLocation', async (payload) => {
+    try {
+      const { orderId, newLocation } = payload;
+
+      if (!orderId || !newLocation)
+        throw { message: 'Missing required fields: orderId, newLocation' };
+
+      if (!socket.user.role === 'DELIVERY-PARTNER')
+        throw {
+          message: `You are not authorised to update delivery partner's location`,
+        };
+
+      if (!mongoose.Types.ObjectId.isValid(orderId))
+        throw { message: 'Invalid orderId' };
+
+      const order = await Order.findById(orderId);
+      if (!order) throw { message: 'No order found with that id' };
+
+      socket.to(orderId).emit('newDeliveryLocation', payload);
+    } catch (error) {
+      socket.emit(
+        'error',
+        error?.message || 'Something went wrong while updating location',
       );
     }
   });
@@ -54,6 +102,8 @@ const initialiseSocketIo = (io) => {
       socket.join(decodedToken.id);
 
       mountBuyerJoinOrderEvent(socket);
+      mountDeliveryJoinOrderEvent(socket);
+      mountSetDeliveryLocationEvent(socket);
     } catch (error) {
       socket.emit(
         'connection_error',
