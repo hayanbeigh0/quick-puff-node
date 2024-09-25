@@ -33,7 +33,7 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
     puff: {
-      type: Number,
+      type: [Number],
       min: 0,
       max: Infinity,
       default: null,
@@ -46,7 +46,7 @@ const productSchema = new mongoose.Schema(
       },
     },
     volume: {
-      type: Number,
+      type: [Number],
       min: 0,
       max: Infinity,
       default: null,
@@ -59,7 +59,7 @@ const productSchema = new mongoose.Schema(
       },
     },
     nicotineStrength: {
-      type: Number,
+      type: [Number],
       min: 0,
       max: Infinity,
       default: 0,
@@ -71,7 +71,7 @@ const productSchema = new mongoose.Schema(
       default: false,
     },
     flavor: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: [mongoose.Schema.Types.ObjectId],
       ref: 'Flavor',
     },
     productCategory: {
