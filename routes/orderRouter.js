@@ -17,6 +17,9 @@ router.route('/orderDates').get(orderController.getOrderDates);
 
 router.route('/:orderId').delete(orderController.cancelOrder);
 
-router.route('/:id').get(orderController.getOrder);
+router
+  .route('/:id')
+  .get(orderController.getOrder)
+  .patch(orderController.updateOrderStatus);
 
 module.exports = router;

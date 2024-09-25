@@ -451,7 +451,42 @@ const cancelOrder = setTransaction(async (req, res, next, session) => {
   });
 });
 
-const getOrderLocation = setTransaction(async (req, res, next, session) => {});
+const updateOrderStatus = catchAsync(async (req, res, next) => {
+  const { id } = req.params; // Order ID from the request parameters
+  const { newStatus } = req.body; // New status from the request body
+
+  // Find the order by ID
+  const order = await Order.findById(id);
+
+  if (!order) {
+    return next(new AppError('Order not found', 404));
+  }
+
+  // Optional: Validate status transition logic (e.g., cannot move from 'delivered' back to 'shipped')
+  const currentStatus = order.status;
+
+  if (currentStatus === 'delivered' && newStatus !== 'cancelled') {
+    return next(
+      new AppError('Cannot update the status of a delivered order', 400),
+    );
+  }
+
+  // Update the current status and add to the status history
+  order.status = newStatus;
+  order.statusHistory.push({
+    status: newStatus,
+    changedAt: new Date(),
+  });
+
+  // Save the order
+  await order.save();
+
+  // Return the updated order
+  res.status(200).json({
+    status: 'success',
+    order,
+  });
+});
 
 module.exports = {
   createOrder,
@@ -460,4 +495,5 @@ module.exports = {
   getOrder,
   getOrderDates,
   getOrdersOnDate,
+  updateOrderStatus,
 };
