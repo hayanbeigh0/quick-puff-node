@@ -13,9 +13,37 @@ const RecentSearch = require('../models/recentSearchModel');
 
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
-  if (req.body.puff && req.body.volume) {
-    return next(new AppError('Either puff or volume must be provided.', 400));
+  // Ensure that either puff or volume is provided, but not both at the same time
+  if (
+    (req.body.puff && req.body.volume) ||
+    (!req.body.puff && !req.body.volume)
+  ) {
+    return next(
+      new AppError(
+        'Either puff or volume must be provided, but not both.',
+        400,
+      ),
+    );
   }
+
+  // Log the puff and volume arrays if they exist
+  if (req.body.puff) {
+    console.log('Puff:', req.body.puff);
+  }
+  if (req.body.volume) {
+    console.log('Volume:', req.body.volume);
+  }
+
+  // Check if puff or volume is an empty array and set it to null if empty
+  const puff =
+    Array.isArray(req.body.puff) && req.body.puff.length > 0
+      ? req.body.puff
+      : null;
+  const volume =
+    Array.isArray(req.body.volume) && req.body.volume.length > 0
+      ? req.body.volume
+      : null;
+
   // Proceed with product creation after file upload
   const publicId = await uploadImage(req.file, 'products');
   const assetInfo = getImageUrl(publicId);
@@ -28,12 +56,13 @@ const createProduct = catchAsync(async (req, res, next) => {
     price: req.body.price,
     oldPrice: req.body.oldPrice,
     stock: req.body.stock,
-    puff: req.body.puff,
-    volume: req.body.volume,
+    puff: puff, // Set to null if empty
+    volume: volume, // Set to null if empty
     productCategory: req.body.productCategory,
     brand: req.body.brand,
   });
 
+  // Respond with the newly created product
   res.status(201).json({
     status: 'success',
     data: {
@@ -111,6 +140,88 @@ const updateProduct = catchAsync(async (req, res, next) => {
     status: 'success',
     data: {
       product: updatedProduct,
+    },
+  });
+});
+
+const getProduct = catchAsync(async (req, res, next) => {
+  const { productId } = req.params;
+
+  // Find the product by ID
+  const product = await Product.findById(productId);
+  if (!product) return next(new AppError('Product not found', 404));
+
+  res.status(200).json({
+    status: 'success',
+    product,
+  });
+});
+
+const getProductPrice = catchAsync(async (req, res, next) => {
+  const { productId } = req.params;
+  const { puff, flavor, volume, nicotineStrength } = req.body;
+
+  // 1. Find the product by ID
+  const product = await Product.findById(productId);
+
+  if (!product) {
+    return next(new AppError('Product not found', 404));
+  }
+
+  // 2. Set the base price to the product price
+  let finalPrice = product.price;
+
+  // 3. Adjust price based on puffOptions if provided
+  if (puff) {
+    if (!product.puffOptions.includes(puff)) {
+      return next(new AppError('Invalid puff option', 400));
+    }
+    // Example: Add $5 if puff option is 5000 or more
+    if (puff >= 5000) {
+      finalPrice += 5;
+    }
+  }
+
+  // 4. Adjust price based on volumeOptions if provided
+  if (volume) {
+    if (!product.volumeOptions.includes(volume)) {
+      return next(new AppError('Invalid volume option', 400));
+    }
+    // Example: Add $3 if volume option is 100ml or more
+    if (volume >= 20) {
+      finalPrice += 3;
+    }
+  }
+
+  // 5. Adjust price based on nicotineStrength if provided
+  if (nicotineStrength) {
+    if (!product.nicotineStrengthOptions.includes(nicotineStrength)) {
+      return next(new AppError('Invalid nicotine strength option', 400));
+    }
+    // Example: Add $2 if nicotine strength is 50mg or more
+    if (nicotineStrength >= 5) {
+      finalPrice += 2;
+    }
+  }
+
+  // 6. Adjust price based on flavorOptions if provided
+  if (flavor) {
+    console.log(product.flavorOptions);
+    if (!product.flavorOptions.includes(flavor)) {
+      return next(new AppError('Invalid flavor option', 400));
+    }
+    // Example: Add $1 for flavor option
+    finalPrice += 1;
+  }
+
+  // 7. Send response with the final calculated price
+  res.status(200).json({
+    status: 'success',
+    data: {
+      productId: product.id,
+      basePrice: product.price,
+      finalPrice,
+      selectedOptions: { puff, flavor, volume, nicotineStrength },
     },
   });
 });
@@ -482,4 +593,6 @@ module.exports = {
   getSearchSuggestions,
   getPopularProducts,
   getProductFilter,
+  getProduct,
+  getProductPrice,
 };

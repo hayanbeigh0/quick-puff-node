@@ -45,6 +45,19 @@ const productSchema = new mongoose.Schema(
         message: 'Either puff or volume should be set, not both.',
       },
     },
+    puffOptions: {
+      type: [Number],
+      min: 0,
+      max: Infinity,
+      default: null,
+      validate: {
+        validator: function (v) {
+          // Check if either puff or volume is set, but not both
+          return this.volume == null || v == null;
+        },
+        message: 'Either puff or volume should be set, not both.',
+      },
+    },
     volume: {
       type: Number,
       min: 0,
@@ -58,8 +71,28 @@ const productSchema = new mongoose.Schema(
         message: 'Either puff or volume should be set, not both.',
       },
     },
+    volumeOptions: {
+      type: [Number],
+      min: 0,
+      max: Infinity,
+      default: null,
+      validate: {
+        validator: function (v) {
+          // Check if either puff or volume is set, but not both
+          return this.puff == null || v == null;
+        },
+        message: 'Either puff or volume should be set, not both.',
+      },
+    },
     nicotineStrength: {
       type: Number,
+      min: 0,
+      max: Infinity,
+      default: 0,
+      required: true,
+    },
+    nicotineStrengthOptions: {
+      type: [Number],
       min: 0,
       max: Infinity,
       default: 0,
@@ -72,6 +105,10 @@ const productSchema = new mongoose.Schema(
     },
     flavor: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: 'Flavor',
+    },
+    flavorOptions: {
+      type: [mongoose.Schema.Types.ObjectId],
       ref: 'Flavor',
     },
     productCategory: {

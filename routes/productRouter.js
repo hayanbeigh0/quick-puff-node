@@ -21,7 +21,11 @@ router
   );
 router
   .route('/:productId')
+  .get(authController.protect, productController.getProduct)
   .delete(authController.protect, productController.deleteProduct);
+router
+  .route('/:productId/price')
+  .get(authController.protect, productController.getProductPrice);
 router
   .route('/search')
   .get(authController.protect, productController.searchProducts);
