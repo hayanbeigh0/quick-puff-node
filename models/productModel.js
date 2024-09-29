@@ -120,6 +120,12 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Brand',
     },
+    ingredients: [
+      {
+        type: String,
+        required: true,
+      },
+    ],
     soldCount: { type: Number, default: 0 }, // Total units sold
     reviewCount: { type: Number, default: 0 }, // Number of reviews
     averageRating: { type: Number, default: 0 }, // Average product rating
