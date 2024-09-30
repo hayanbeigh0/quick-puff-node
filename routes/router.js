@@ -14,6 +14,7 @@ const recentSearchRouter = require('./recentSearchRouter');
 const cartRouter = require('./cartRouter');
 const orderRouter = require('./orderRouter');
 const adminRouter = require('./adminRouter');
+const advertisementRouter = require('./advertisementRouter');
 
 const router = express.Router();
 
@@ -31,4 +32,5 @@ router.use('/recentSearch', recentSearchRouter);
 router.use('/cart', cartRouter);
 router.use('/order', orderRouter);
 router.use('/admin', adminRouter);
+router.use('/advertisement', advertisementRouter);
 module.exports = router;

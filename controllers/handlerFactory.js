@@ -4,19 +4,18 @@ const catchAsync = require('../utils/catchAsync');
 const setTransaction = require('./transactionController');
 
 exports.fn = function () {
-  console.log('this is the export functionx');
+  console.log('this is the export function');
 };
 
 exports.deleteOne = (Model) => {
-  // On each delete, if the references of the document also needs to be deleted,
-  // then we will have to check if the document has a model/schema type which can have references of
-  // its documents in the other models / schema's.
-  return setTransaction(async (req, res, next, session) => {
-    const doc = await Model.findByIdAndDelete(req.params.id, { session });
+  // On each delete, check for references that may also need to be deleted.
+  return catchAsync(async (req, res, next) => {
+    const doc = await Model.findByIdAndDelete(req.params.id);
     if (!doc) {
-      throw new Error('No document found with that ID');
+      throw new AppError('No document found with that ID', 404);
     }
     res.status(204).json({
+      status: 'success',
       data: null,
     });
   });
@@ -56,8 +55,11 @@ exports.createOne = (Model) =>
 exports.getOne = (Model, popOptions) =>
   catchAsync(async (req, res, next) => {
     let query = Model.findById(req.params.id);
+
+    // If there are population options, apply the .populate() method
     if (popOptions) query = query.populate(popOptions);
-    let doc = await query;
+
+    const doc = await query;
 
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
@@ -66,34 +68,33 @@ exports.getOne = (Model, popOptions) =>
     res.status(200).json({
       status: 'success',
       data: {
-        data: doc, // Include the modified document object
+        data: doc,
       },
     });
   });
 
-exports.getAll = (Model) =>
+exports.getAll = (Model, popOptions) =>
   catchAsync(async (req, res, next) => {
     let filter = {};
-    if (req.params.productId)
-      filter = { ...filter, tour: req.params.productId };
+    if (req.params.productId) filter = { product: req.params.productId };
 
-    console.log('filter', filter);
-
-    // BUILD THE QUERY
+    // Build the query
     let query = Model.find(filter);
 
-    let features = new APIFeatures(query, req.query)
+    // Apply API Features like filtering, sorting, limiting fields, and pagination
+    const features = new APIFeatures(query, req.query)
       .filter()
       .sort()
       .limitFields()
       .paginate();
 
-    console.log(features);
-
-    // EXECUTE THE QUERY
     let data = await features.query;
 
-    // SEND RESPONSE
+    // Populate related fields (e.g., 'product', 'flavor')
+    if (popOptions) {
+      data = await Model.populate(data, popOptions);
+    }
+
     res.status(200).json({
       status: 'success',
       results: data.length,

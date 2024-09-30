@@ -50,33 +50,7 @@ const io = new socketIo.Server(http_server, {
 
 app.set('io', io);
 
-console.log('initializing the socket');
 initialiseSocketIo(io);
-
-// io.on('connection', (socket) => {
-//   try {
-//     // parse the cookies from the handshake headers (This is only possible if client has `withCredentials: true`)
-//     const cookies = cookie.parse(socket.handshake.headers?.cookie || '');
-
-//     let token = cookies?.accessToken; // get the accessToken
-
-//     if (!token) {
-//       // If there is no access token in cookies. Check inside the handshake auth
-//       // token = socket.handshake.auth?.token;
-//       token = socket.handshake.headers.accesstoken;
-//     }
-
-//     const decodedToken = jwt.verify(token, process.env.JWT_SECRET); // decode the token
-//     console.log('this is the decoded token', decodedToken);
-
-//     socket.join(decodedToken.id);
-//   } catch (error) {
-//     socket.emit(
-//       'connection_error',
-//       error?.message || 'Something went wrong while connecting to the socket.',
-//     );
-//   }
-// });
 
 const http_port = +(process.env.PORT || 3000);
 
