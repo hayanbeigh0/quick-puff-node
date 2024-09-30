@@ -148,7 +148,7 @@ const getProduct = catchAsync(async (req, res, next) => {
   const { productId } = req.params;
 
   // Find the product by ID
-  const product = await Product.findById(productId).populate('flavor');
+  const product = await Product.findById(productId).populate('flavor flavorOptions');
   if (!product) return next(new AppError('Product not found', 404));
 
   res.status(200).json({
