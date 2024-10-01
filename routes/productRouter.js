@@ -21,7 +21,7 @@ router
   );
 router
   .route('/:productId')
-  .get(authController.protect, productController.getProduct)
+  .get(productController.getProduct)
   .delete(authController.protect, productController.deleteProduct);
 router
   .route('/:productId/price')
