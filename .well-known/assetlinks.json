@@ -2,7 +2,7 @@
   {
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
-      "namespace": "com.example.quick_puff",
+      "namespace": "android_app",
       "package_name": "com.example.quick_puff",
       "sha256_cert_fingerprints": [
         "8F:DF:EF:96:14:94:F9:22:84:79:E5:4D:42:AD:D2:1F:3B:48:14:DA:B9:88:77:EA:23:E5:89:5B:4E:F4:EC:17"
