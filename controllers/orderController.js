@@ -330,11 +330,39 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
       },
     },
     {
+      $unwind: '$items', // Unwind the items array so we can perform lookup per item
+    },
+    {
       $lookup: {
         from: 'products',
         localField: 'items.product',
         foreignField: '_id',
         as: 'productDetails',
+      },
+    },
+    {
+      $unwind: '$productDetails', // Unwind the product details since each item corresponds to one product
+    },
+    {
+      $group: {
+        _id: '$_id',
+        orderNumber: { $first: '$orderNumber' },
+        totalPrice: { $first: '$totalPrice' },
+        status: { $first: '$status' },
+        deliveryTimeRange: { $first: '$deliveryTimeRange' },
+        createdAt: { $first: '$createdAt' },
+        items: {
+          $push: {
+            id: '$items._id', // Assuming each item has its own _id
+            product: {
+              id: '$productDetails._id', // Product details
+              name: '$productDetails.name',
+              price: '$productDetails.price',
+              image: '$productDetails.image',
+            },
+            quantity: '$items.quantity', // Keep the quantity field from each item
+          },
+        },
       },
     },
     {
@@ -345,22 +373,7 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
         status: 1,
         deliveryTimeRange: 1,
         createdAt: 1,
-        items: {
-          $map: {
-            input: '$items',
-            as: 'item',
-            in: {
-              id: '$$item._id', // Assuming each item has its own _id
-              product: {
-                id: { $arrayElemAt: ['$productDetails._id', 0] }, // Rename _id to id for product
-                name: { $arrayElemAt: ['$productDetails.name', 0] },
-                price: { $arrayElemAt: ['$productDetails.price', 0] },
-                image: { $arrayElemAt: ['$productDetails.image', 0] },
-              },
-              quantity: '$$item.quantity', // Keep the quantity field from each item
-            },
-          },
-        },
+        items: 1,
         _id: 0,
       },
     },
