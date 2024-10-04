@@ -35,6 +35,26 @@ const calculateDistance = (fromLocation, toLocation) => {
   return geolib.getDistance(fromLocation, toLocation) / 1000; // Convert meters to kilometers
 };
 
+// Format the time range for delivery
+const formatTimeRange = (createdAt, deliveryTimeMinutes) => {
+  const startDate = new Date(createdAt);
+  const endDate = new Date(startDate);
+  endDate.setMinutes(startDate.getMinutes() + deliveryTimeMinutes);
+
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    hours = hours % 12 || 12; // Convert to 12-hour format
+    return `${hours}:${minutes} ${ampm}`;
+  };
+
+  const startTime = formatTime(startDate);
+  const endTime = formatTime(endDate);
+
+  return `${startTime} - ${endTime}`;
+};
+
 const generateUniqueOrderNumber = async () => {
   let orderNumber;
   let isUnique = false;
@@ -161,26 +181,6 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     estimatedDeliveryTimeHours * 60,
   );
 
-  // Format the time range for delivery
-  const formatTimeRange = (createdAt, deliveryTimeMinutes) => {
-    const startDate = new Date(createdAt);
-    const endDate = new Date(startDate);
-    endDate.setMinutes(startDate.getMinutes() + deliveryTimeMinutes);
-
-    const formatTime = (date) => {
-      let hours = date.getHours();
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      const ampm = hours >= 12 ? 'pm' : 'am';
-      hours = hours % 12 || 12; // Convert to 12-hour format
-      return `${hours}:${minutes} ${ampm}`;
-    };
-
-    const startTime = formatTime(startDate);
-    const endTime = formatTime(endDate);
-
-    return `${startTime} - ${endTime}`;
-  };
-
   const deliveryTimeRange = formatTimeRange(
     new Date(),
     estimatedDeliveryTimeMinutes,
@@ -283,6 +283,186 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     status: 'success',
     orders: newOrder,
     deliveryTimeRange: deliveryTimeRange, // Send delivery time range in the response
+  });
+});
+
+const reorder = setTransaction(async (req, res, next, session) => {
+  const userId = req.user._id;
+  const previousOrderId = req.params.orderId;
+
+  // 1. Retrieve the previous order
+  const previousOrder = await Order.findById(previousOrderId)
+    .populate('items.product') // Populate product details to check stock and price
+    .session(session);
+
+  console.log(previousOrder);
+
+  if (!previousOrder || previousOrder.user.toString() !== userId.toString()) {
+    return next(
+      new AppError(
+        'Order not found or you do not have permission to reorder it',
+        404,
+      ),
+    );
+  }
+
+  // 2. Check availability of each item in the previous order
+  let productTotalPrice = 0;
+  const newItems = [];
+  for (const item of previousOrder.items) {
+    const product = await Product.findById(item.product._id).session(session);
+
+    if (!product || product.stock < item.quantity) {
+      return next(
+        new AppError(
+          `Product ${item.product.name} is out of stock or insufficient stock`,
+          400,
+          ErrorCodes.OUT_OF_STOCK.code,
+        ),
+      );
+    }
+
+    const price = product.price;
+    productTotalPrice += item.quantity * price;
+
+    newItems.push({
+      product: product._id,
+      quantity: item.quantity,
+    });
+  }
+
+  // 3. Retrieve the delivery address from the previous order
+  const deliveryAddress = previousOrder.deliveryAddress;
+  if (!deliveryAddress || !deliveryAddress.coordinates) {
+    return next(new AppError('Invalid delivery address', 400));
+  }
+
+  // 4. Calculate the distance between the seller's location and the user's delivery address
+  const distance = calculateDistance(
+    {
+      latitude: deliveryAddress.coordinates[1],
+      longitude: deliveryAddress.coordinates[0],
+    },
+    sellerLocation,
+  );
+
+  // 5. Calculate dynamic delivery and service fees based on distance
+  const deliveryFee = DELIVERY_FEE_BASE + distance * 0.5;
+  const serviceFee = SERVICE_FEE_BASE + (distance > 10 ? 2 : 0);
+
+  // 6. Recalculate the final total price including fees and optional tip
+  const tipAmount = req.body.tipAmount || previousOrder.tipAmount || 0;
+  productTotalPrice += tipAmount;
+
+  if (productTotalPrice < MIN_DELIVERY_AMOUNT) {
+    return next(
+      new AppError(
+        `Minimum order amount for delivery is $${MIN_DELIVERY_AMOUNT}`,
+        400,
+      ),
+    );
+  }
+
+  let totalPrice = productTotalPrice + deliveryFee + serviceFee;
+
+  // 7. Apply promo code discount (if applicable)
+  const promoCode = req.body.promoCode || previousOrder.promoCode || null;
+  let discountAmount = 0;
+  if (promoCode) {
+    const promo = await PromoCode.findOne({ code: promoCode });
+
+    if (!promo || promo.expirationDate < Date.now()) {
+      return next(new AppError('Promo code is invalid or expired', 400));
+    }
+
+    if (productTotalPrice < promo.minOrderValue) {
+      return next(
+        new AppError(
+          `Minimum order value to apply this promo code is $${promo.minOrderValue}`,
+          400,
+          ErrorCodes.MIN_ORDER_AMOUNT_RESTRICTION.code,
+        ),
+      );
+    }
+
+    if (promo.discountType === 'percentage') {
+      discountAmount = (productTotalPrice * promo.discountValue) / 100;
+    } else if (promo.discountType === 'flat') {
+      discountAmount = promo.discountValue;
+    }
+
+    totalPrice -= discountAmount;
+  }
+
+  // 8. Generate a unique order number
+  const orderNumber = await generateUniqueOrderNumber();
+
+  // 9. Set payment details based on the payment method
+  let paymentStatus = 'pending'; // For 'cash_on_delivery' or 'credit_card_on_delivery'
+  let transactionId = null;
+
+  if (req.body.paymentMethod === 'credit_card') {
+    const paymentVerified = await verifyPayment(
+      req.body.paymentGatewayResponse,
+    );
+
+    if (!paymentVerified) {
+      return next(new AppError('Payment verification failed', 400));
+    }
+
+    paymentStatus = 'paid';
+    transactionId = req.body.transactionId;
+  }
+
+  // 10. Estimate delivery time and format the time range
+  const deliverySpeedKmPerHour = 40;
+  const estimatedDeliveryTimeHours = distance / deliverySpeedKmPerHour;
+  const estimatedDeliveryTimeMinutes = Math.ceil(
+    estimatedDeliveryTimeHours * 60,
+  );
+  const deliveryTimeRange = formatTimeRange(
+    new Date(),
+    estimatedDeliveryTimeMinutes,
+  );
+
+  // 11. Create a new order with the same items, adjusted for stock and price
+  const newOrder = await Order.create(
+    [
+      {
+        user: userId,
+        orderNumber: orderNumber,
+        items: newItems,
+        deliveryAddress: deliveryAddress,
+        paymentMethod: req.body.paymentMethod,
+        paymentStatus: paymentStatus,
+        transactionId: transactionId,
+        tipAmount: tipAmount,
+        promoCode: promoCode,
+        totalPrice: totalPrice,
+        serviceFee: serviceFee,
+        deliveryFee: deliveryFee,
+        trackingNumber: req.body.trackingNumber || '',
+        status: 'pending',
+        statusHistory: [{ status: 'pending', changedAt: new Date() }],
+        orderNotes: req.body.orderNotes || previousOrder.orderNotes || '',
+        deliveryTimeRange: deliveryTimeRange,
+      },
+    ],
+    { session },
+  );
+
+  // 12. Restore the inventory for the new order
+  for (const item of newItems) {
+    await Product.findByIdAndUpdate(item.product, {
+      $inc: { stock: -item.quantity },
+    }).session(session);
+  }
+
+  // 13. Send response with the newly created order
+  res.status(201).json({
+    status: 'success',
+    orders: newOrder,
+    deliveryTimeRange: deliveryTimeRange,
   });
 });
 
@@ -509,4 +689,5 @@ module.exports = {
   getOrderDates,
   getOrdersOnDate,
   updateOrderStatus,
+  reorder,
 };

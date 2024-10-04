@@ -13,6 +13,7 @@ router
   .get(orderController.getOrders);
 
 router.route('/myOrders').get(orderController.getOrdersOnDate);
+router.route('/:orderId/reorder').post(orderController.reorder);
 router.route('/orderDates').get(orderController.getOrderDates);
 
 router.route('/:orderId').delete(orderController.cancelOrder);
