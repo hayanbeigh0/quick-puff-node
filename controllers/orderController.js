@@ -461,7 +461,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
   // 13. Send response with the newly created order
   res.status(201).json({
     status: 'success',
-    orders: newOrder,
+    order: newOrder[0],
     deliveryTimeRange: deliveryTimeRange,
   });
 });
