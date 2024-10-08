@@ -42,6 +42,9 @@ const ErrorCodes = {
   USER_ID_NOT_VERIFIED: {
     code: 'ORDER004',
   },
+  OUT_OF_STOCK: {
+    code: 'ORDER005',
+  },
 };
 
 module.exports = ErrorCodes;
