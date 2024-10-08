@@ -551,6 +551,9 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
       },
     },
     {
+      $sort: { createdAt: -1 }, // Sort by createdAt in descending order (latest first)
+    },
+    {
       $project: {
         id: '$_id', // Rename _id to id for the order
         orderNumber: 1,

@@ -105,7 +105,14 @@ const orderSchema = new mongoose.Schema(
     trackingNumber: String,
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'out-for-delivery'],
+      enum: [
+        'pending',
+        'confirmed',
+        'shipped',
+        'delivered',
+        'cancelled',
+        'out-for-delivery',
+      ],
       default: 'pending',
     },
     statusHistory: [
@@ -169,6 +176,9 @@ const orderSchema = new mongoose.Schema(
     },
   },
 );
+
+// Create an index on the `createdAt` field to ensure sorting by creation date
+orderSchema.index({ createdAt: 1 });
 
 const Order = mongoose.model('Order', orderSchema);
 
