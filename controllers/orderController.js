@@ -458,10 +458,15 @@ const reorder = setTransaction(async (req, res, next, session) => {
     }).session(session);
   }
 
-  // 13. Send response with the newly created order
+  // 13. Populate the product details in the newly created order
+  const populatedOrder = await Order.findById(newOrder[0]._id)
+    .populate('items.product') // Populate the product in the items list
+    .session(session);
+
+  // 14. Send response with the populated order
   res.status(201).json({
     status: 'success',
-    order: newOrder[0],
+    order: populatedOrder,
     deliveryTimeRange: deliveryTimeRange,
   });
 });
