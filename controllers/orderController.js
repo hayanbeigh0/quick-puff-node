@@ -9,6 +9,7 @@ const PromoCode = require('../models/promoCodeModel');
 const factory = require('../controllers/handlerFactory');
 const setTransaction = require('../controllers/transactionController');
 const geolib = require('geolib');
+const FulfillmentCenter = require('../models/fulfillmentCenterModel');
 
 const MINIMUM_AGE = 21;
 
@@ -159,20 +160,50 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('Invalid delivery address', 400));
   }
 
-  // 5. Calculate the distance between the seller's location and the user's delivery address
+  const MAX_DISTANCE_KM = 100000;
+
+  // 5. Find the nearest fulfillment center to the user's delivery address
+  const nearestFulfillmentCenter = await FulfillmentCenter.findOne({
+    coordinates: {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: deliveryAddress.coordinates, // User's delivery coordinates
+        },
+        $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
+      },
+    },
+  }).session(session);
+
+  console.log(nearestFulfillmentCenter);
+
+  if (!nearestFulfillmentCenter) {
+    return next(
+      new AppError(
+        'No fulfillment center available nearby',
+        404,
+        ErrorCodes.NO_NEAREST_FULLFILMENT_CENTER_FOUND.code,
+      ),
+    );
+  }
+
+  // 6. Calculate the distance between the fulfillment center and the user's delivery address
   const distance = calculateDistance(
     {
       latitude: deliveryAddress.coordinates[1],
       longitude: deliveryAddress.coordinates[0],
     },
-    sellerLocation,
+    {
+      latitude: nearestFulfillmentCenter.coordinates[1],
+      longitude: nearestFulfillmentCenter.coordinates[0],
+    },
   );
 
-  // 6. Calculate dynamic delivery and service fees based on distance
+  // 7. Calculate dynamic delivery and service fees based on distance
   const deliveryFee = DELIVERY_FEE_BASE + distance * 0.5; // Add $0.5 per km
   const serviceFee = SERVICE_FEE_BASE + (distance > 10 ? 2 : 0); // Add extra $2 if distance is > 10km
 
-  // 7. Estimate delivery time (assumed delivery speed of 40 km/h)
+  // 8. Estimate delivery time (assumed delivery speed of 40 km/h)
   const deliverySpeedKmPerHour = 40; // Example: constant speed of 40 km/h
   const estimatedDeliveryTimeHours = distance / deliverySpeedKmPerHour;
 
@@ -186,7 +217,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     estimatedDeliveryTimeMinutes,
   );
 
-  // 8. Apply promo code discount (if applicable)
+  // 9. Apply promo code discount (if applicable)
   const promoCode = req.body.promoCode || null;
   let discountAmount = 0;
   if (promoCode) {
@@ -215,13 +246,13 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     productTotalPrice -= discountAmount;
   }
 
-  // 9. Calculate the final total price including delivery and service fees
+  // 10. Calculate the final total price including delivery and service fees
   let totalPrice = productTotalPrice + deliveryFee + serviceFee;
 
-  // 10. Generate a unique order number
+  // 11. Generate a unique order number
   const orderNumber = await generateUniqueOrderNumber();
 
-  // 11. Set payment details based on the payment method
+  // 12. Set payment details based on the payment method
   let paymentStatus = 'pending'; // For 'cash_on_delivery' or 'credit_card_on_delivery'
   let transactionId = null;
 
@@ -239,7 +270,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     transactionId = req.body.transactionId; // Set transaction ID for successful card payments
   }
 
-  // 12. Create the order and set all relevant fields, including deliveryTimeRange
+  // 13. Create the order and set all relevant fields, including deliveryTimeRange and fromAddress
   const newOrder = await Order.create(
     [
       {
@@ -250,6 +281,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
           quantity: item.quantity,
         })),
         deliveryAddress: deliveryAddress,
+        fromAddress: nearestFulfillmentCenter, // Set the nearest fulfillment center as fromAddress
         paymentMethod: req.body.paymentMethod,
         paymentStatus: paymentStatus, // 'pending' for COD or 'paid' for successful credit card payments
         transactionId: transactionId, // Set transaction ID only for credit card payments
@@ -268,21 +300,28 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     { session },
   );
 
-  // 13. Restore the inventory
+  // 14. Restore the inventory
   for (const item of cart.items) {
     await Product.findByIdAndUpdate(item.product._id, {
       $inc: { stock: -item.quantity },
     }).session(session);
   }
 
-  // 14. Clear the cart after order creation
+  // 15. Clear the cart after order creation
   await Cart.findOneAndDelete({ user: userId }).session(session);
 
-  // 15. Send response with the created order including deliveryTimeRange
+  // Populate the product details, delivery partner, and from address in the newly created order
+  const populatedOrder = await Order.findById(newOrder[0]._id)
+    .populate('items.product') // Populate the product in the items list
+    .populate('deliveryPartner') // Populate the delivery partner
+    .populate('fromAddress') // Populate the from address
+    .session(session);
+
+  // Send the response with the new order details
   res.status(201).json({
     status: 'success',
-    orders: newOrder,
-    deliveryTimeRange: deliveryTimeRange, // Send delivery time range in the response
+    order: populatedOrder,
+    deliveryTimeRange: deliveryTimeRange,
   });
 });
 
@@ -292,10 +331,8 @@ const reorder = setTransaction(async (req, res, next, session) => {
 
   // 1. Retrieve the previous order
   const previousOrder = await Order.findById(previousOrderId)
-    .populate('items.product') // Populate product details to check stock and price
+    .populate('items.product') // Populate product details
     .session(session);
-
-  console.log(previousOrder);
 
   if (!previousOrder || previousOrder.user.toString() !== userId.toString()) {
     return next(
@@ -306,7 +343,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
     );
   }
 
-  // 2. Check availability of each item in the previous order
+  // 2. Check the availability of each item and adjust the total price
   let productTotalPrice = 0;
   const newItems = [];
   for (const item of previousOrder.items) {
@@ -322,7 +359,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
       );
     }
 
-    const price = product.price;
+    const price = product.price; // Get the current price
     productTotalPrice += item.quantity * price;
 
     newItems.push({
@@ -337,20 +374,51 @@ const reorder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('Invalid delivery address', 400));
   }
 
-  // 4. Calculate the distance between the seller's location and the user's delivery address
+  // 4. Retrieve the fromAddress from the previous order
+  const MAX_DISTANCE_KM = 100000;
+
+  // 5. Find the nearest fulfillment center to the user's delivery address
+  const nearestFulfillmentCenter = await FulfillmentCenter.findOne({
+    coordinates: {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: deliveryAddress.coordinates, // User's delivery coordinates
+        },
+        $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
+      },
+    },
+  }).session(session);
+
+  console.log(nearestFulfillmentCenter);
+
+  if (!nearestFulfillmentCenter) {
+    return next(
+      new AppError(
+        'No fulfillment center available nearby',
+        404,
+        ErrorCodes.NO_NEAREST_FULLFILMENT_CENTER_FOUND.code,
+      ),
+    );
+  }
+
+  // 5. Calculate the distance between the fromAddress and the deliveryAddress
   const distance = calculateDistance(
     {
       latitude: deliveryAddress.coordinates[1],
       longitude: deliveryAddress.coordinates[0],
     },
-    sellerLocation,
+    {
+      latitude: nearestFulfillmentCenter.coordinates[1],
+      longitude: nearestFulfillmentCenter.coordinates[0],
+    },
   );
 
-  // 5. Calculate dynamic delivery and service fees based on distance
+  // 6. Calculate dynamic delivery and service fees based on distance
   const deliveryFee = DELIVERY_FEE_BASE + distance * 0.5;
   const serviceFee = SERVICE_FEE_BASE + (distance > 10 ? 2 : 0);
 
-  // 6. Recalculate the final total price including fees and optional tip
+  // 7. Include optional tip in the total price
   const tipAmount = req.body.tipAmount || previousOrder.tipAmount || 0;
   productTotalPrice += tipAmount;
 
@@ -365,7 +433,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
 
   let totalPrice = productTotalPrice + deliveryFee + serviceFee;
 
-  // 7. Apply promo code discount (if applicable)
+  // 8. Apply promo code discount (if any)
   const promoCode = req.body.promoCode || previousOrder.promoCode || null;
   let discountAmount = 0;
   if (promoCode) {
@@ -394,10 +462,10 @@ const reorder = setTransaction(async (req, res, next, session) => {
     totalPrice -= discountAmount;
   }
 
-  // 8. Generate a unique order number
+  // 9. Generate a unique order number
   const orderNumber = await generateUniqueOrderNumber();
 
-  // 9. Set payment details based on the payment method
+  // 10. Set payment details based on the payment method
   let paymentStatus = 'pending'; // For 'cash_on_delivery' or 'credit_card_on_delivery'
   let transactionId = null;
 
@@ -414,7 +482,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
     transactionId = req.body.transactionId;
   }
 
-  // 10. Estimate delivery time and format the time range
+  // 11. Estimate delivery time and format the time range
   const deliverySpeedKmPerHour = 40;
   const estimatedDeliveryTimeHours = distance / deliverySpeedKmPerHour;
   const estimatedDeliveryTimeMinutes = Math.ceil(
@@ -425,7 +493,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
     estimatedDeliveryTimeMinutes,
   );
 
-  // 11. Create a new order with the same items, adjusted for stock and price
+  // 12. Create a new order
   const newOrder = await Order.create(
     [
       {
@@ -433,6 +501,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
         orderNumber: orderNumber,
         items: newItems,
         deliveryAddress: deliveryAddress,
+        fromAddress: nearestFulfillmentCenter,
         paymentMethod: req.body.paymentMethod,
         paymentStatus: paymentStatus,
         transactionId: transactionId,
@@ -451,19 +520,21 @@ const reorder = setTransaction(async (req, res, next, session) => {
     { session },
   );
 
-  // 12. Restore the inventory for the new order
+  // 13. Update the product stock after the new order is created
   for (const item of newItems) {
     await Product.findByIdAndUpdate(item.product, {
       $inc: { stock: -item.quantity },
     }).session(session);
   }
 
-  // 13. Populate the product details in the newly created order
+  // 14. Populate the product details in the newly created order
   const populatedOrder = await Order.findById(newOrder[0]._id)
-    .populate('items.product') // Populate the product in the items list
+    .populate('items.product')
+    .populate('deliveryPartner')
+    .populate('fromAddress')
     .session(session);
 
-  // 14. Send response with the populated order
+  // 15. Send the response with the new order details
   res.status(201).json({
     status: 'success',
     order: populatedOrder,
@@ -471,15 +542,25 @@ const reorder = setTransaction(async (req, res, next, session) => {
   });
 });
 
-const getOrders = factory.getAll(Order);
+const getOrders = factory.getAll(Order, [
+  {
+    path: 'fromAddress',
+  },
+  {
+    path: 'deliveryPartner',
+  },
+]);
+
 const getOrder = catchAsync(async (req, res, next) => {
   let query = Order.findById(req.params.id);
 
   // Use 'populate' with 'select' to get specific fields from 'product'
-  query.populate({
-    path: 'items.product',
-    select: 'name price image', // Specify the fields you want to include
-  });
+  query
+    .populate({
+      path: 'items.product',
+      select: 'name price image', // Specify the fields you want to include
+    })
+    .populate('fromAddress');
 
   let order = await query;
 
@@ -529,13 +610,44 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
       $unwind: '$productDetails', // Unwind the product details since each item corresponds to one product
     },
     {
+      $lookup: {
+        from: 'users', // Lookup to populate delivery partner details
+        localField: 'deliveryPartner',
+        foreignField: '_id',
+        as: 'deliveryPartnerDetails',
+      },
+    },
+    {
+      $unwind: {
+        path: '$deliveryPartnerDetails',
+        preserveNullAndEmptyArrays: true, // Keep orders with no assigned delivery partner
+      },
+    },
+    // Add a $lookup to populate the fromAddress (FulfillmentCenter)
+    {
+      $lookup: {
+        from: 'fulfillmentcenters', // The collection name for FulfillmentCenter
+        localField: 'fromAddress', // Field in the Order model referencing the fulfillment center
+        foreignField: '_id', // Foreign field in the FulfillmentCenter collection
+        as: 'fromAddressDetails',
+      },
+    },
+    {
+      $unwind: {
+        path: '$fromAddressDetails',
+        preserveNullAndEmptyArrays: true, // Keep orders even if no fulfillment center is assigned
+      },
+    },
+    {
       $group: {
         _id: '$_id',
         orderNumber: { $first: '$orderNumber' },
         totalPrice: { $first: '$totalPrice' },
         status: { $first: '$status' },
         deliveryTimeRange: { $first: '$deliveryTimeRange' },
+        fromAddress: { $first: '$fromAddressDetails' }, // Include the populated FulfillmentCenter details
         createdAt: { $first: '$createdAt' },
+        deliveryPartner: { $first: '$deliveryPartnerDetails' }, // Add the populated delivery partner info
         items: {
           $push: {
             id: '$items._id', // Assuming each item has its own _id
@@ -560,6 +672,35 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
         totalPrice: 1,
         status: 1,
         deliveryTimeRange: 1,
+        fromAddress: {
+          $cond: {
+            if: { $not: ['$fromAddress'] }, // If fromAddress (FulfillmentCenter) is empty
+            then: null, // Set it to null
+            else: {
+              id: '$fromAddress.id',
+              name: '$fromAddress.name',
+              coordinates: '$fromAddress.coordinates',
+              floor: '$fromAddress.floor',
+              appartment: '$fromAddress.appartment',
+              addressDetails: '$fromAddress.addressDetails',
+              addressPhoneNumber: '$fromAddress.addressPhoneNumber',
+              description: '$fromAddress.description',
+            },
+          },
+        },
+        deliveryPartner: {
+          $cond: {
+            if: { $not: ['$deliveryPartner'] }, // If deliveryPartner is empty
+            then: null, // Set it to null
+            else: {
+              id: '$deliveryPartner._id',
+              firstName: '$deliveryPartner.firstName',
+              lastName: '$deliveryPartner.lastName',
+              phone: '$deliveryPartner.phoneNumber', // Assuming the delivery partner has a 'phone' field
+              email: '$deliveryPartner.email', // Assuming delivery partner has an email
+            },
+          },
+        },
         createdAt: 1,
         items: 1,
         _id: 0,
@@ -655,21 +796,78 @@ const cancelOrder = setTransaction(async (req, res, next, session) => {
 const updateOrderStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params; // Order ID from the request parameters
   const { newStatus } = req.body; // New status from the request body
+  const currentUser = req.user; // User information from the request
 
   // Find the order by ID
-  const order = await Order.findById(id);
+  const order = await Order.findById(id).populate('fromAddress');
 
   if (!order) {
     return next(new AppError('Order not found', 404));
   }
 
-  // Optional: Validate status transition logic (e.g., cannot move from 'delivered' back to 'shipped')
   const currentStatus = order.status;
 
-  if (currentStatus === 'delivered' && newStatus !== 'cancelled') {
-    return next(
-      new AppError('Cannot update the status of a delivered order', 400),
-    );
+  // Check if the user is a delivery partner and trying to change the status to "out-for-delivery"
+  if (
+    currentUser.role === 'delivery-partner' &&
+    newStatus === 'out-for-delivery'
+  ) {
+    // Only allow the change if the current status is "ready-for-delivery"
+    if (currentStatus !== 'ready-for-delivery') {
+      return next(
+        new AppError(
+          'You can only change the status to out-for-delivery from ready-for-delivery',
+          400,
+        ),
+      );
+    }
+
+    // Check if the order already has a delivery partner assigned
+    if (
+      order.deliveryPartner &&
+      !order.deliveryPartner.equals(currentUser._id)
+    ) {
+      return next(
+        new AppError(
+          'This order is already assigned to another delivery partner',
+          403,
+        ),
+      );
+    }
+
+    // Assign the current delivery partner if none is assigned
+    if (!order.deliveryPartner) {
+      order.deliveryPartner = currentUser._id;
+    }
+  } else if (
+    newStatus === 'out-for-delivery' &&
+    currentUser.role !== 'delivery-partner'
+  ) {
+    return next(new AppError('You are not a delivery partner.', 404));
+  } else if (
+    newStatus === 'ready-for-delivery' &&
+    currentUser.role === 'delivery-partner'
+  ) {
+    // Check if the delivery partner is trying to change the status back to "ready-for-delivery"
+    if (currentStatus !== 'out-for-delivery') {
+      return next(
+        new AppError(
+          'You can only change the status back to ready-for-delivery from out-for-delivery',
+          400,
+        ),
+      );
+    }
+
+    // Unassign the delivery partner when the order is moved back to "ready-for-delivery"
+    order.deliveryPartner = undefined;
+  } else {
+    // For all other roles and statuses, allow the status change
+    // (including delivery partners for statuses other than "out-for-delivery")
+    if (currentStatus === 'delivered' && newStatus !== 'cancelled') {
+      return next(
+        new AppError('Cannot update the status of a delivered order', 400),
+      );
+    }
   }
 
   // Update the current status and add to the status history

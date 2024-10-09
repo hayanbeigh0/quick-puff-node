@@ -15,6 +15,7 @@ const cartRouter = require('./cartRouter');
 const orderRouter = require('./orderRouter');
 const adminRouter = require('./adminRouter');
 const advertisementRouter = require('./advertisementRouter');
+const fulfillmentCenterRouter = require('./fulfillmentCenterRouter');
 
 const router = express.Router();
 
@@ -33,4 +34,5 @@ router.use('/cart', cartRouter);
 router.use('/order', orderRouter);
 router.use('/admin', adminRouter);
 router.use('/advertisement', advertisementRouter);
+router.use('/fulfillmentCenter', fulfillmentCenterRouter);
 module.exports = router;

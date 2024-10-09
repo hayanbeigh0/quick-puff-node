@@ -45,6 +45,9 @@ const ErrorCodes = {
   OUT_OF_STOCK: {
     code: 'ORDER005',
   },
+  NO_NEAREST_FULLFILMENT_CENTER_FOUND: {
+    code: 'ORDER006',
+  },
 };
 
 module.exports = ErrorCodes;

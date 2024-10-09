@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const deliveryAddressLocationSchema = new mongoose.Schema(
+const addressLocationSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -65,7 +65,15 @@ const orderSchema = new mongoose.Schema(
         },
       },
     ],
-    deliveryAddress: deliveryAddressLocationSchema,
+    deliveryAddress: addressLocationSchema,
+    fromAddress: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FulfillmentCenter',
+    },
+    deliveryPartner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
     paymentMethod: {
       type: String,
       enum: ['cash_on_delivery', 'credit_card_on_delivery', 'credit_card'],
@@ -111,6 +119,7 @@ const orderSchema = new mongoose.Schema(
         'shipped',
         'delivered',
         'cancelled',
+        'ready-for-delivery',
         'out-for-delivery',
       ],
       default: 'pending',
