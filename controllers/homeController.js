@@ -103,6 +103,7 @@ const homePageData = catchAsync(async (req, res, next) => {
                     puff: 1,
                     volume: 1,
                     productCategory: '$productCategoryInfo.name', // Include product category name
+                    productCategoryId: '$productCategoryInfo._id', // Include product category id
                     _id: 0, // Exclude `_id`
                   },
                 },
@@ -121,6 +122,7 @@ const homePageData = catchAsync(async (req, res, next) => {
                 },
               },
               productCategory: { $first: '$products.productCategory' }, // Add category of products
+              productCategoryId: { $first: '$products.productCategoryId' }, // Add product category id
             },
           },
           {
