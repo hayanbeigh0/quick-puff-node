@@ -349,6 +349,21 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
         },
       },
     },
+    // Lookup to populate flavor
+    {
+      $lookup: {
+        from: 'flavors', // Name of the flavor collection
+        localField: 'flavor', // Field in Product
+        foreignField: '_id', // Field in Flavor collection
+        as: 'flavorDetails', // Output field
+      },
+    },
+    {
+      $unwind: {
+        path: '$flavorDetails',
+        preserveNullAndEmptyArrays: true, // If no flavor found, it won't throw an error
+      },
+    },
     {
       $facet: {
         products: [
@@ -365,10 +380,15 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
               volume: 1,
               stock: 1,
               nicotineStrength: 1,
-              flavor: 1,
+              flavor: {
+                id: '$flavorDetails._id', // Rename _id to id
+                name: '$flavorDetails.name',
+                createdAt: '$flavorDetails.createdAt',
+                updatedAt: '$flavorDetails.updatedAt',
+              },
               averageRating: 1,
               hasDeal: { $gt: ['$oldPrice', '$price'] },
-              _id: 0,
+              _id: 0, // Remove _id
             },
           },
         ],
