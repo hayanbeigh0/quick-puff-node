@@ -38,6 +38,7 @@ const homePageData = catchAsync(async (req, res, next) => {
     // Fetch from database if not in cache
     productCategories = await ProductCategory.find()
       .select('name image _id')
+      .limit(6)
       .lean();
     // Rename _id to id
     productCategories = productCategories.map((category) => ({
