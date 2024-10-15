@@ -148,7 +148,9 @@ const getProduct = catchAsync(async (req, res, next) => {
   const { productId } = req.params;
 
   // Find the product by ID
-  const product = await Product.findById(productId).populate('flavor flavorOptions');
+  const product = await Product.findById(productId).populate(
+    'flavor flavorOptions',
+  );
   if (!product) return next(new AppError('Product not found', 404));
 
   res.status(200).json({
@@ -363,7 +365,7 @@ const getPopularProducts = catchAsync(async (req, res, next) => {
     },
     {
       $project: {
-        id: '$_id',
+        id: '$_id', // Map `_id` to `id`
         name: 1,
         image: 1,
         price: 1,
@@ -371,13 +373,13 @@ const getPopularProducts = catchAsync(async (req, res, next) => {
         volume: 1,
         stock: 1,
         nicotineStrength: 1,
-        flavor: 1,
+        // flavor: 1,
         averageRating: 1,
         soldCount: 1,
-        reviewCount: 1,
-        popularityScore: 1,
+        // reviewCount: 1,
+        // popularityScore: 1,
         hasDeal: { $gt: ['$oldPrice', '$price'] }, // Determine if the product has a deal
-        _id: 0,
+        _id: 0, // Exclude `_id`
       },
     },
   ]);
