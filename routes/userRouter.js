@@ -8,6 +8,9 @@ const router = express.Router();
 
 router.route('/').patch(authController.protect, userController.updateProfile);
 router
+  .route('/currentUser')
+  .get(authController.protect, userController.getCurrentUser);
+router
   .route('/myDeliveryAddressLocations')
   .post(authController.protect, userController.addDeliveryAddressLocations)
   .get(authController.protect, userController.getDeliveryAddressLocations)

@@ -246,6 +246,22 @@ const verifyOrRejectPhotoId = catchAsync(async (req, res, next) => {
   });
 });
 
+const getCurrentUser = catchAsync(async (req, res, next) => {
+  // `req.user` should already contain the authenticated user's data
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user,
+    },
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -257,4 +273,5 @@ module.exports = {
   uploadPhotoId,
   getPendingVerifications,
   verifyOrRejectPhotoId,
+  getCurrentUser,
 };
