@@ -146,9 +146,20 @@ const updateCartItemQuantity = catchAsync(async (req, res, next) => {
 
   await cart.save();
 
+  // Remove flavor and flavorOptions fields from the product in the cart response
+  const cartResponse = cart.toObject(); // Convert cart document to plain object
+  cartResponse.items = cartResponse.items.map((item) => {
+    const { product } = item;
+    const { flavor, flavorOptions, ...productWithoutFlavors } = product; // Exclude `flavor` and `flavorOptions`
+    return {
+      ...item,
+      product: productWithoutFlavors, // Assign the product without flavors to the item
+    };
+  });
+
   res.status(200).json({
     status: 'success',
-    cart,
+    cart: cartResponse, // Return the modified cart without flavor and flavorOptions
   });
 });
 
