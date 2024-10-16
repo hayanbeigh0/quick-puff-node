@@ -284,7 +284,7 @@ const searchProducts = catchAsync(async (req, res, next) => {
               volume: 1,
               stock: 1,
               nicotineStrength: 1,
-              flavor: 1,
+              // flavor: 1,
               averageRating: 1,
               _id: 0,
             },
