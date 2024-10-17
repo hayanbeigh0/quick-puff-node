@@ -49,12 +49,24 @@ const addItemToCart = catchAsync(async (req, res, next) => {
 
   // Calculate total price before saving the cart
   await cart.calculateTotalPrice();
-
   await cart.save();
+
+  // Clone the cart object for response manipulation
+  const cartForResponse = cart.toObject();
+
+  // Remove `flavor` and `flavorOptions` from each item before sending the response
+  cartForResponse.items.forEach((item) => {
+    if (item.product.flavor) {
+      delete item.product.flavor;
+    }
+    if (item.product.flavorOptions) {
+      delete item.product.flavorOptions;
+    }
+  });
 
   res.status(200).json({
     status: 'success',
-    cart,
+    cart: cartForResponse,
   });
 });
 
