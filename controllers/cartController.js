@@ -112,9 +112,21 @@ const removeItemFromCart = catchAsync(async (req, res, next) => {
 
   await cart.save();
 
+  // Exclude the 'flavor' property from the cart items before sending the response
+  const cartWithoutFlavor = cart.toObject(); // Convert to a plain object if not already
+  cartWithoutFlavor.items.forEach((item) => {
+    if (item.product.flavor) {
+      delete item.product.flavor; // Remove the flavor property
+    }
+    if (item.product.flavorOptions) {
+      delete item.product.flavorOptions; // Remove the flavorOptions property, if needed
+    }
+  });
+
+  // Send response without flavor property
   res.status(200).json({
     status: 'success',
-    cart,
+    cart: cartWithoutFlavor,
   });
 });
 
