@@ -23,7 +23,6 @@ const deliveryAddressLocationSchema = new mongoose.Schema(
     default: {
       type: Boolean,
       default: false,
-      required: [true, 'A User must have a default delivery address'],
     },
   },
   {
