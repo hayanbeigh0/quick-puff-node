@@ -803,7 +803,10 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
   const currentUser = req.user; // User information from the request
 
   // Find the order by ID
-  const order = await Order.findById(id).populate('fromAddress');
+  const order = await Order.findById(id).populate('fromAddress').populate({
+    path: 'deliveryPartner',
+    select: 'firstName lastName phoneNumber email',
+  });
 
   if (!order) {
     return next(new AppError('Order not found', 404));
