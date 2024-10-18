@@ -560,7 +560,11 @@ const getOrder = catchAsync(async (req, res, next) => {
       path: 'items.product',
       select: 'name price image', // Specify the fields you want to include
     })
-    .populate('fromAddress');
+    .populate('fromAddress')
+    .populate({
+      path: 'deliveryPartner',
+      select: 'firstName lastName phoneNumber email',
+    });
 
   let order = await query;
 
