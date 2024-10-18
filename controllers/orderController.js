@@ -809,14 +809,11 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
 
   // Check if the user is a delivery partner and trying to change the status to "out-for-delivery"
   if (
-    (currentUser.role === 'delivery-partner' || currentUser.role === 'admin') &&
+    currentUser.role === 'delivery-partner' &&
     newStatus === 'out-for-delivery'
   ) {
     // Only allow the change if the current status is "ready-for-delivery"
-    if (
-      currentStatus !== 'ready-for-delivery' &&
-      currentUser.role !== 'admin'
-    ) {
+    if (currentStatus !== 'ready-for-delivery') {
       return next(
         new AppError(
           'You can only change the status to out-for-delivery from ready-for-delivery',
