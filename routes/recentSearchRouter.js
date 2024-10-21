@@ -11,7 +11,7 @@ router
     authController.protect, // Ensure the user is authenticated
     recentSearchController.addRecentSearch, // Create the product
   )
-  .get(recentSearchController.getRecentSearches);
+  .get(authController.protect, recentSearchController.getRecentSearches);
 router
   .route('/:searchId')
   .delete(authController.protect, recentSearchController.deleteRecentSearch);
