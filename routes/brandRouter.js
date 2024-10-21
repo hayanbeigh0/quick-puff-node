@@ -13,7 +13,7 @@ router
     fileUploadController.handleFileUpload, // Handle file upload
     brandController.createBrand, // Create the brand
   )
-  .get(authController.protect, brandController.getBrands)
+  .get(brandController.getBrands)
   .patch(
     authController.protect,
     fileUploadController.handleFileUpload,

@@ -13,7 +13,7 @@ router
     fileUploadController.handleFileUpload, // Handle file upload
     productCategoryController.createProductCategory, // Create the product
   )
-  .get(authController.protect, productCategoryController.getProductCategories)
+  .get(productCategoryController.getProductCategories)
   .patch(
     authController.protect,
     fileUploadController.handleFileUpload,

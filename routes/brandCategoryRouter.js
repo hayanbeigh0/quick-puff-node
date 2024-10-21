@@ -11,7 +11,7 @@ router
     authController.protect, // Ensure the user is authenticated
     brandCategoryController.createBrandCategory, // Create the brand
   )
-  .get(authController.protect, brandCategoryController.getBrandCategories)
+  .get(brandCategoryController.getBrandCategories)
   .patch(authController.protect, brandCategoryController.updateBrandCategory);
 router
   .route('/:categoryId')

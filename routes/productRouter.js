@@ -7,18 +7,12 @@ const fileUploadController = require('../controllers/fileUploadController');
 const router = express.Router();
 
 // Get popular products - put this before dynamic routes to avoid conflict
-router
-  .route('/popular')
-  .get(authController.protect, productController.getPopularProducts);
+router.route('/popular').get(productController.getPopularProducts);
 
 // Search products and get suggestions
-router
-  .route('/search')
-  .get(authController.protect, productController.searchProducts);
+router.route('/search').get(productController.searchProducts);
 
-router
-  .route('/search/suggestions')
-  .get(authController.protect, productController.getSearchSuggestions);
+router.route('/search/suggestions').get(productController.getSearchSuggestions);
 
 // Create and get all products
 router
@@ -28,7 +22,7 @@ router
     fileUploadController.handleFileUpload,
     productController.createProduct,
   )
-  .get(authController.protect, productController.getProducts)
+  .get(productController.getProducts)
   .patch(
     authController.protect,
     fileUploadController.handleFileUpload,
@@ -38,7 +32,7 @@ router
 // Get products with filters (based on brandId and categoryId)
 router
   .route('/filters/:brandId/:categoryId')
-  .get(authController.protect, productController.getProductFilter);
+  .get(productController.getProductFilter);
 
 // Dynamic route for individual product
 router
@@ -46,8 +40,6 @@ router
   .get(productController.getProduct)
   .delete(authController.protect, productController.deleteProduct);
 
-router
-  .route('/:productId/price')
-  .get(authController.protect, productController.getProductPrice);
+router.route('/:productId/price').get(productController.getProductPrice);
 
 module.exports = router;

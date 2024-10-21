@@ -11,11 +11,10 @@ router
     authController.protect, // Ensure the user is authenticated
     flavorController.createFlavor, // Create the product
   )
-  .get(authController.protect, flavorController.getFlavors);
+  .get(flavorController.getFlavors);
 router
   .route('/:id')
   .get(
-    authController.protect, // Ensure the user is authenticated
     flavorController.getFlavor, // Create the product
   )
   .patch(authController.protect, flavorController.updateFlavor)
