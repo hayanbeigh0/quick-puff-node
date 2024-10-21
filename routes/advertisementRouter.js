@@ -5,18 +5,16 @@ const advertisementController = require('../controllers/advertisementController'
 
 const router = express.Router();
 
-router.use(authController.protect);
-
 router
   .route('/')
-  .post(advertisementController.createAdvertisement)
+  .post(authController.protect, advertisementController.createAdvertisement)
   .get(advertisementController.getAdvertisements);
 
 router
   .route('/:id')
   .get(advertisementController.getAdvertisement)
-  .patch(advertisementController.updateAdvertisement)
-  .delete(advertisementController.deleteAdvertisement);
+  .patch(authController.protect, advertisementController.updateAdvertisement)
+  .delete(authController.protect, advertisementController.deleteAdvertisement);
 router
   .route('/category/:id')
   .get(advertisementController.getAdvertisementBasedOnCategory);
