@@ -179,7 +179,7 @@ exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
   try {
     await sendEmail({
       email: user.email,
-      subject: 'Your authentication code for login',
+      subject: 'Your verification code for login',
       mailgenContent: loginCodeMailgenContent(user.name, verificationCode),
     });
 

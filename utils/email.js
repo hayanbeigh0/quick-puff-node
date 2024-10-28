@@ -1,7 +1,8 @@
-const Mailgen = require("mailgen");
-const nodemailer = require("nodemailer");
+const Mailgen = require('mailgen');
+const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// const { MailerSend, EmailParams, Sender, Recipient } = require("mailersend"); 
+// const { MailerSend, EmailParams, Sender, Recipient } = require("mailersend");
 
 // const mailerSend = new MailerSend({
 //   apiKey: process.env.MAILSEND_API_TOKEN,
@@ -9,23 +10,23 @@ const nodemailer = require("nodemailer");
 
 const sendEmailVerificationCode = async ({ email, verificationCode }) => {
   const sentFrom = new Sender(
-    "hayan@trial-3yxj6ljy077ldo2r.mlsender.net",
-    "Hayan Beigh"
+    'hayan@trial-3yxj6ljy077ldo2r.mlsender.net',
+    'Hayan Beigh',
   );
 
-  const recipients = [new Recipient(email, "Your Client")];
+  const recipients = [new Recipient(email, 'Your Client')];
 
   const emailParams = new EmailParams()
     .setFrom(sentFrom)
     .setTo(recipients)
     .setReplyTo(sentFrom)
-    .setSubject("Verification code")
+    .setSubject('Verification code')
     .setHtml(
       `<strong>
      ${verificationCode}
-    </strong>`
+    </strong>`,
     )
-    .setText("This is the text content");
+    .setText('This is the text content');
 
   const response = await mailerSend.email.send(emailParams);
 };
@@ -38,48 +39,36 @@ const sendEmailVerificationCode = async ({ email, verificationCode }) => {
 // import nodemailer from "nodemailer";
 
 const sendEmail = async (options) => {
-  // Initialize mailgen instance with default theme and brand configuration
+  // Set the SendGrid API key from environment variables
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+  // Initialize Mailgen with theme and brand configuration
   const mailGenerator = new Mailgen({
-    theme: "default",
+    theme: 'default',
     product: {
-      name: "Quick Puff",
-      link: "https://deliveryapptest.com",
+      name: 'Quick Puff',
+      link: 'https://deliveryapptest.com',
     },
   });
 
-  // Generate the plaintext version of the e-mail (for clients that do not support HTML)
-  const emailTextual = mailGenerator.generatePlaintext(options.mailgenContent);
-
-  // Generate an HTML email with the provided contents
+  // Generate the plaintext and HTML versions of the email
+  const emailText = mailGenerator.generatePlaintext(options.mailgenContent);
   const emailHtml = mailGenerator.generate(options.mailgenContent);
 
-  // Create a nodemailer transporter instance which is responsible to send a mail
-  const transporter = nodemailer.createTransport({
-    host: process.env.MAILTRAP_SMTP_HOST,
-    port: process.env.MAILTRAP_SMTP_PORT,
-    auth: {
-      user: process.env.MAILTRAP_SMTP_USER,
-      pass: process.env.MAILTRAP_SMTP_PASS,
-    },
-  });
-
-  const mail = {
-    from: "mail.delivery@gmail.com", // We can name this anything. The mail will go to your Mailtrap inbox
-    to: options.email, // receiver's mail
-    subject: options.subject, // mail subject
-    text: emailTextual, // mailgen content textual variant
-    html: emailHtml, // mailgen content html variant
+  // Email details
+  const mailOptions = {
+    to: options.email, // Recipient email
+    from: 'quickpuff048@gmail.com', // Sender email address
+    subject: options.subject, // Email subject
+    text: emailText, // Plaintext version
+    html: emailHtml, // HTML version
   };
 
   try {
-    await transporter.sendMail(mail);
+    // Send the email using SendGrid
+    await sgMail.send(mailOptions);
   } catch (error) {
-    // As sending email is not strongly coupled to the business logic it is not worth to raise an error when email sending fails
-    // So it's better to fail silently rather than breaking the app
-    console.log(
-      "Email service failed silently. Make sure you have provided your MAILTRAP credentials in the .env file"
-    );
-    console.log("Error: ", error);
+    console.error('Failed to send email:', error.response?.body || error);
   }
 };
 
@@ -90,10 +79,10 @@ const emailVerificationMailgenContent = (username, verificationUrl) => {
       intro: "Welcome to our app! We're very excited to have you on board.",
       action: {
         instructions:
-          "To verify your email please click on the following button:",
+          'To verify your email please click on the following button:',
         button: {
-          color: "#22BC66", // Optional action button color
-          text: "Verify your email",
+          color: '#22BC66', // Optional action button color
+          text: 'Verify your email',
           link: verificationUrl,
         },
       },
@@ -107,12 +96,11 @@ const loginCodeMailgenContent = (username, verificationCode) => {
   return {
     body: {
       name: username,
-      intro: "Welcome to our app! We're very excited to have you on board.",
+      intro: "Welcome to Quick Puff! We're very excited to have you on board.",
       action: {
-        instructions:
-          "Here is your login code:",
+        instructions: 'Here is your verification code:',
         button: {
-          color: "#22BC66", // Optional action button color
+          color: '#22BC66', // Optional action button color
           text: verificationCode,
           // link: verificationUrl,
         },
@@ -123,10 +111,9 @@ const loginCodeMailgenContent = (username, verificationCode) => {
   };
 };
 
-
 module.exports = {
   sendEmailVerificationCode,
   sendEmail,
   emailVerificationMailgenContent,
-  loginCodeMailgenContent
+  loginCodeMailgenContent,
 };

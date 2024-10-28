@@ -10,6 +10,7 @@
   "author": "Hayan Beigh",
   "license": "ISC",
   "dependencies": {
+    "@sendgrid/mail": "^8.1.4",
     "apple-signin-auth": "^1.7.6",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.4.0",
