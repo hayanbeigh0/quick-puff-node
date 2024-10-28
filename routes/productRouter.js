@@ -10,7 +10,9 @@ const router = express.Router();
 router.route('/popular').get(productController.getPopularProducts);
 
 // Search products and get suggestions
-router.route('/search').get(productController.searchProducts);
+router
+  .route('/search')
+  .get(authController.getUser, productController.searchProducts);
 
 router.route('/search/suggestions').get(productController.getSearchSuggestions);
 
