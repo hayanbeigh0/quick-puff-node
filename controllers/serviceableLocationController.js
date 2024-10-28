@@ -43,17 +43,17 @@ const checkIfServiceableLocation = catchAsync(async (req, res, next) => {
   const { zipCode, countryCode } = req.body;
 
   // Check if the zipCode exists in the ServiceableLocation collection
-  const serviceableLocation = await ServiceableLocation.findOne({
-    zipCode,
-    countryCode,
-  });
+  // const serviceableLocation = await ServiceableLocation.findOne({ // Need to disable it temporarily
+  //   zipCode,
+  //   countryCode,
+  // });
 
-  if (!serviceableLocation) {
-    return res.status(404).json({
-      status: 'fail',
-      message: 'This location is not serviceable.',
-    });
-  }
+  // if (!serviceableLocation) {
+  //   return res.status(404).json({
+  //     status: 'fail',
+  //     message: 'This location is not serviceable.',
+  //   });
+  // }
 
   res.status(200).json({
     status: 'success',
