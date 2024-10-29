@@ -28,9 +28,20 @@ const updateProfile = catchAsync(async (req, res, next) => {
 const addDeliveryAddressLocations = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user._id);
 
-  if (!user) return next(new AppError('No user found with that id', 400));
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
 
-  if (req.body) user.deliveryAddressLocations.push(req.body);
+  // Set default to false for all existing delivery addresses
+  user.deliveryAddressLocations.forEach((location) => {
+    location.default = false;
+  });
+
+  // Add the new address with default set to true
+  if (req.body) {
+    const newAddress = { ...req.body, default: true };
+    user.deliveryAddressLocations.push(newAddress);
+  }
 
   const updatedUser = await user.save();
 
