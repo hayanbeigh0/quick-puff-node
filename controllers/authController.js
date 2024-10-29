@@ -132,7 +132,7 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
   const email = appleEmail || reqEmail;
 
   // Check if the user already exists in your database
-  let user = await User.findOne({ appleId });
+  let user = await User.findOne({ email });
 
   if (!user) {
     // If the user does not exist, create a new user
