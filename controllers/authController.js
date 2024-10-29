@@ -96,7 +96,7 @@ exports.googleSignIn = catchAsync(async (req, res, next) => {
 
 // Apple Sign-In
 exports.appleSignIn = catchAsync(async (req, res, next) => {
-  const { idToken, email, fullName } = req.body;
+  const { idToken, email: reqEmail, fullName } = req.body;
 
   if (!idToken) {
     return next(
@@ -110,6 +110,7 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
 
   let appleUser;
   try {
+    // Verify the Apple ID token
     appleUser = await appleSigninAuth.verifyIdToken(idToken, {
       audience: process.env.APPLE_CLIENT_ID,
       ignoreExpiration: false,
@@ -124,21 +125,25 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
     );
   }
 
-  const { sub: appleId } = appleUser;
+  // Extract the fields you need from the verified token
+  const { sub: appleId, email: appleEmail } = appleUser;
 
-  // Check if the user already exists
+  // If Apple doesn't provide the email in the token, fall back to the email from the request body
+  const email = appleEmail || reqEmail;
+
+  // Check if the user already exists in your database
   let user = await User.findOne({ appleId });
 
   if (!user) {
     // If the user does not exist, create a new user
     user = await User.create({
       name: fullName,
-      email,
-      appleId,
+      email, // Store the email as a string, not an object
+      appleId, // Apple-specific user identifier
     });
   }
 
-  // Create and send token
+  // Create and send token for the authenticated user
   createAndSendToken(user, 200, res);
 });
 
