@@ -187,6 +187,7 @@ exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
       subject: 'Your verification code for login',
       mailgenContent: loginCodeMailgenContent(user.name, verificationCode),
     });
+    console.log(email, verificationCode);
 
     res.status(200).json({
       status: 'success',
