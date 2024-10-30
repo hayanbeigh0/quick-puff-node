@@ -4,7 +4,7 @@
     "details": [
       {
         "appID": "XCUTNS56DG.com.quiickpuff.app",
-        "paths": ["/api/v1/product/*"]
+        "paths": ["*"]
       }
     ]
   }
