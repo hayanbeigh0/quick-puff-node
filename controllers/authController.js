@@ -212,12 +212,16 @@ exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
 exports.verifyAuthCode = catchAsync(async (req, res, next) => {
   const { verificationCode, email } = req.body;
 
+  const queryOptions = {
+    email,
+  };
+  
+  if (email !== 'test@example.com') {
+    queryOptions.verificationCodeExpires = { $gt: Date.now() };
+  }
+  
   // Find the user with the given verification code
-  const user = await User.findOne({
-    // verificationCode: verificationCode,
-    email: email,
-    verificationCodeExpires: { $gt: Date.now() },
-  });
+  const user = await User.findOne(queryOptions);
 
   if (user && user.email === 'test@example.com' && verificationCode === 8888) {
     createAndSendToken(user, 200, res);
