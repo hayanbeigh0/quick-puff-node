@@ -90,7 +90,7 @@ app.use((req, res, next) => {
   const deepLinkURL = 'yourappscheme://'; // Replace with your app's custom URL scheme
 
   // Check if the request path is intended for deep linking
-  if (req.path.includes('https://quick-puff-node.onrender.com')) {
+  if (req.path.includes('api/v1')) {
     // Adjust this check based on your deep link structure
     if (/iPhone|iPad|iPod/i.test(userAgent)) {
       // iOS device
