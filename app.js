@@ -98,41 +98,31 @@ app.use((req, res, next) => {
       (/Android/i.test(userAgent) && /Chrome/i.test(userAgent)); // Android Chrome or other browser
 
     if (isMobileBrowser) {
-      if (/iPhone|iPad|iPod/i.test(userAgent)) {
-        // iOS device
-        res.send(`
+      // Serve an HTML page with options to download or open the app
+      res.send(`
           <html>
             <head>
-              <title>Redirecting...</title>
+              <title>Get the App</title>
+              <style>
+                body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .container { text-align: center; }
+                .button { display: inline-block; padding: 15px 25px; margin: 10px; font-size: 16px; text-decoration: none; color: white; border-radius: 5px; }
+                .app-store { background-color: #007aff; } /* iOS color */
+                .play-store { background-color: #34a853; } /* Android color */
+                .open-app { background-color: #333; }
+              </style>
             </head>
             <body>
-              <script type="text/javascript">
-                window.location.href = '${deepLinkURL}';
-                setTimeout(function () {
-                  window.location.href = '${appStoreURL}';
-                }, 500);
-              </script>
+              <div class="container">
+                <h2>Get Our App</h2>
+                <p>Open the app if it's already installed, or download it from the store:</p>
+                <a href="${deepLinkURL}" class="button open-app">Open App</a><br>
+                <a href="${appStoreURL}" class="button app-store">Download on App Store</a>
+                <a href="${playStoreURL}" class="button play-store">Download on Play Store</a>
+              </div>
             </body>
           </html>
         `);
-      } else if (/Android/i.test(userAgent)) {
-        // Android device
-        res.send(`
-          <html>
-            <head>
-              <title>Redirecting...</title>
-            </head>
-            <body>
-              <script type="text/javascript">
-                window.location.href = '${deepLinkURL}';
-                setTimeout(function () {
-                  window.location.href = '${playStoreURL}';
-                }, 500);
-              </script>
-            </body>
-          </html>
-        `);
-      }
     } else {
       // If not a mobile browser, bypass the middleware
       next();
