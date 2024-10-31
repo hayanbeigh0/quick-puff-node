@@ -94,20 +94,63 @@ app.use((req, res, next) => {
     // Adjust this check based on your deep link structure
     if (/iPhone|iPad|iPod/i.test(userAgent)) {
       // iOS device
+      console.log('IOS device');
       res.send(`
-        <html>
-          <head>
-            <title>Redirecting...</title>
-          </head>
-          <body>
-            <script type="text/javascript">
-              window.location.href = '${deepLinkURL}';
-              setTimeout(function () {
-                window.location.href = '${appStoreURL}';
-              }, 500);
-            </script>
-          </body>
-        </html>
+       <html>
+  <head>
+    <title>Redirecting...</title>
+    <style>
+      /* Basic styling for centering and button */
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f9f9f9;
+        color: #333;
+      }
+      .container {
+        text-align: center;
+        padding: 20px;
+        background-color: #ffffff;
+        box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+      }
+      .button {
+        padding: 10px 20px;
+        margin-top: 20px;
+        background-color: #007aff;
+        color: #ffffff;
+        text-decoration: none;
+        font-size: 16px;
+        border-radius: 5px;
+      }
+      .button:hover {
+        background-color: #005bb5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Redirecting to Quick Puff</h1>
+      <p>If the app doesnt open, you can download it below:</p>
+      <a href="${appStoreURL}" class="button">Download for iOS</a>
+    </div>
+
+    <script type="text/javascript">
+      // Attempt to open the app via the deep link
+      window.location.href = '${deepLinkURL}';
+      
+      // If the app isnt installed, show the download button after a short delay
+      setTimeout(function () {
+        document.querySelector('.container').style.display = 'block';
+      }, 500);
+    </script>
+  </body>
+</html>
+
       `);
     } else if (/Android/i.test(userAgent)) {
       // Android device
