@@ -99,7 +99,31 @@ app.use((req, res, next) => {
 
     if (isMobileBrowser) {
       // Serve an HTML page with options to download or open the app
-      res.send(`
+      if (/iPhone|iPad|iPod/i.test(userAgent) && /Safari/i.test(userAgent)) {
+        res.send(`
+            <html>
+              <head>
+                <title>Get the App</title>
+                <style>
+                  body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                  .container { text-align: center; }
+                  .button { display: inline-block; padding: 15px 25px; margin: 10px; font-size: 16px; text-decoration: none; color: white; border-radius: 5px; }
+                  .app-store { background-color: #007aff; } /* iOS color */
+                  .play-store { background-color: #34a853; } /* Android color */
+                  .open-app { background-color: #333; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h2>Get Our App</h2>
+                  <p>Download the app from the store:</p>
+                  <a href="${appStoreURL}" class="button app-store">Download on App Store</a>
+                </div>
+              </body>
+            </html>
+          `);
+      } else if (/Android/i.test(userAgent) && /Chrome/i.test(userAgent)) {
+        res.send(`
           <html>
             <head>
               <title>Get the App</title>
@@ -115,14 +139,15 @@ app.use((req, res, next) => {
             <body>
               <div class="container">
                 <h2>Get Our App</h2>
-                <p>Open the app if it's already installed, or download it from the store:</p>
-                <a href="${deepLinkURL}" class="button open-app">Open App</a><br>
-                <a href="${appStoreURL}" class="button app-store">Download on App Store</a>
+                <p>Download the app from the store:</p>
                 <a href="${playStoreURL}" class="button play-store">Download on Play Store</a>
               </div>
             </body>
           </html>
         `);
+      } else {
+        next();
+      }
     } else {
       // If not a mobile browser, bypass the middleware
       next();
