@@ -31,6 +31,7 @@ jobs:
           git pull origin main
           npm install
           sudo killall -2 node
-          npm start
+          pm2 start server.js  # Start with pm2
+          pm2 save             # Save the pm2 process list
           exit
         EOF
