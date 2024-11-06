@@ -25,7 +25,7 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << 'EOF'
           # Navigate to your project directory
-          cd /quick-puff-node
+          cd /home/quickpuff048/quick-puff-node
 
           # Run deployment commands
           git pull origin main
