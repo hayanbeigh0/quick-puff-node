@@ -1,0 +1,27 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches:
+      - main  # Trigger on push to main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: SSH into VM and deploy
+        uses: appleboy/ssh-action@v0.1.1
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /quickpuff048/quick-puff-node
+            git pull origin main
+            npm install
+            pm2 restart server.js
