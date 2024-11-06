@@ -3,7 +3,7 @@ name: CI/CD to Google Cloud VM
 on:
   push:
     branches:
-      - main  # Run the workflow on push to the main branch
+      - main  # Adjust this to your deployment branch
 
 jobs:
   deploy:
@@ -13,24 +13,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up SSH
+    - name: Start SSH Agent and Add SSH Key
       uses: webfactory/ssh-agent@v0.5.3
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}  # Add your private key to GitHub secrets
-        ssh-known-hosts: |
-          104.197.126.144
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Deploy to VM
       env:
         HOST: 104.197.126.144
-        USERNAME: hayanbeigh  # your VM username
+        USERNAME: hayanbeigh
       run: |
         ssh -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << 'EOF'
           # Navigate to your project directory
           cd /path/to/your/project
 
-          # Run any deployment or update commands
+          # Run deployment commands
           git pull origin main
           npm install
-          pm2 restart all  # Restart your app if you’re using PM2
+          pm2 restart all  # Restart if you're using PM2
         EOF
