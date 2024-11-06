@@ -32,4 +32,5 @@ jobs:
           npm install
           sudo killall -2 node
           npm start
+          exit
         EOF
