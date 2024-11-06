@@ -30,5 +30,6 @@ jobs:
           # Run deployment commands
           git pull origin main
           npm install
-          rs
+          sudo killall -2 node
+          npm start
         EOF
