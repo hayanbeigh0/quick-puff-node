@@ -1,5 +1,5 @@
 // Import Firebase Cloud Messaging
-const { messaging } = require('./firebase');
+const { messaging } = require('./firebase/firebase');
 
 // Function to send a notification
 const sendNotification = async (token, title, body) => {
