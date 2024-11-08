@@ -109,6 +109,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    deviceTokens: {
+      type: [String], // Store an array of tokens for multi-device support
+    },
     deliveryAddressLocations: [deliveryAddressLocationSchema], // Use the subdocument schema
     active: { type: Boolean, default: true, select: false },
   },

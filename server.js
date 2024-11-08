@@ -1,9 +1,7 @@
 const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
-const cookie = require('cookie');
 
 const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
 const http = require('http');
 const app = require('./app');
 const { initialiseSocketIo } = require('./socket/index');

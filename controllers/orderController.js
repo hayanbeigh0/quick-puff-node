@@ -10,6 +10,7 @@ const factory = require('../controllers/handlerFactory');
 const setTransaction = require('../controllers/transactionController');
 const geolib = require('geolib');
 const FulfillmentCenter = require('../models/fulfillmentCenterModel');
+const { sendNotification } = require('../notifications');
 
 const MINIMUM_AGE = 21;
 
@@ -878,6 +879,20 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
   }
 
   // Update the current status and add to the status history
+  const user = await User.findById(order.user);
+  const userDeviceTokens = user.deviceTokens;
+  console.log(user.email, userDeviceTokens);
+  if (userDeviceTokens) {
+    userDeviceTokens.map(async (token) => {
+      console.log(token);
+      await sendNotification(
+        token,
+        'Order status changed!',
+        `Your order status has changed to ${newStatus}.`,
+      );
+    });
+  }
+
   order.status = newStatus;
   order.statusHistory.push({
     status: newStatus,

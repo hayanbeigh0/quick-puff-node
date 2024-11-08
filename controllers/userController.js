@@ -273,6 +273,119 @@ const getCurrentUser = catchAsync(async (req, res, next) => {
   });
 });
 
+const addDeviceToken = catchAsync(async (req, res, next) => {
+  const { deviceToken } = req.body;
+
+  if (!deviceToken) {
+    return next(new AppError('Device token is required', 400));
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Add the token if it's not already present
+  if (!user.deviceTokens.includes(deviceToken)) {
+    user.deviceTokens.push(deviceToken);
+    await user.save();
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Device token added successfully',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const removeDeviceToken = catchAsync(async (req, res, next) => {
+  const { deviceToken } = req.body;
+
+  if (!deviceToken) {
+    return next(new AppError('Device token is required', 400));
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Remove the token if it exists
+  user.deviceTokens = user.deviceTokens.filter(
+    (token) => token !== deviceToken,
+  );
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Device token removed successfully',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const getDeviceTokens = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('deviceTokens');
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const cleanInvalidDeviceTokens = catchAsync(async (req, res, next) => {
+  const { invalidTokens } = req.body;
+
+  if (!Array.isArray(invalidTokens) || invalidTokens.length === 0) {
+    return next(new AppError('Invalid tokens array is required', 400));
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Remove all tokens that match the invalid tokens
+  user.deviceTokens = user.deviceTokens.filter(
+    (token) => !invalidTokens.includes(token),
+  );
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Invalid tokens removed successfully',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const updateDeviceToken = catchAsync(async (req, res, next) => {
+  const { deviceToken } = req.body;
+
+  if (deviceToken) {
+    const user = await User.findById(req.user._id);
+
+    if (user && !user.deviceTokens.includes(deviceToken)) {
+      user.deviceTokens.push(deviceToken);
+      await user.save();
+    }
+  }
+  return;
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -285,4 +398,9 @@ module.exports = {
   getPendingVerifications,
   verifyOrRejectPhotoId,
   getCurrentUser,
+  removeDeviceToken,
+  addDeviceToken,
+  getDeviceTokens,
+  cleanInvalidDeviceTokens,
+  updateDeviceToken,
 };
