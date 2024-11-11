@@ -280,16 +280,17 @@ const addDeviceToken = catchAsync(async (req, res, next) => {
     return next(new AppError('Device token is required', 400));
   }
 
-  const user = await User.findById(req.user._id);
+  const normalizedToken = deviceToken.trim();
+
+  // Atomic update to add token only if it doesn't already exist
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $addToSet: { deviceTokens: normalizedToken } },
+    { new: true, runValidators: true },
+  );
 
   if (!user) {
     return next(new AppError('No user found with that id', 400));
-  }
-
-  // Add the token if it's not already present
-  if (!user.deviceTokens.includes(deviceToken)) {
-    user.deviceTokens.push(deviceToken);
-    await user.save();
   }
 
   res.status(200).json({
@@ -372,7 +373,7 @@ const cleanInvalidDeviceTokens = catchAsync(async (req, res, next) => {
   });
 });
 
-const updateDeviceToken = catchAsync(async (req, res, next) => {
+const updateDeviceToken = catchAsync(async (req, res) => {
   const { deviceToken } = req.body;
 
   if (deviceToken) {
