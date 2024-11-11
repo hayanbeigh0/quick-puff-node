@@ -21,7 +21,7 @@ jobs:
     - name: Deploy to VM
       env:
         HOST: 104.197.126.144
-        USERNAME: hayanbeigh
+        USERNAME: quickpuff048
       run: |
         ssh -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << 'EOF'
           # Navigate to your project directory
