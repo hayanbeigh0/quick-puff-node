@@ -41,5 +41,15 @@ router
     fileUploadController.handleFileUpload,
     userController.uploadPhotoId,
   );
+router
+  .route('/deviceToken')
+  .post(authController.protect, userController.addDeviceToken)
+  .get(authController.protect, userController.getDeviceTokens)
+  .delete(authController.protect, userController.removeDeviceToken)
+  .patch(authController.protect, userController.cleanInvalidDeviceTokens);
+
+router
+  .route('/deviceToken/invalid')
+  .patch(authController.protect, userController.cleanInvalidDeviceTokens);
 
 module.exports = router;
