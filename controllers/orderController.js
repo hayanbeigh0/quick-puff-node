@@ -815,12 +815,11 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
 
   const currentStatus = order.status;
 
-  // Check if the user is a delivery partner and trying to change the status to "out-for-delivery"
+  // Ensure valid status transitions and role-based checks
   if (
     currentUser.role === 'delivery-partner' &&
     newStatus === 'out-for-delivery'
   ) {
-    // Only allow the change if the current status is "ready-for-delivery"
     if (currentStatus !== 'ready-for-delivery') {
       return next(
         new AppError(
@@ -829,8 +828,6 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
         ),
       );
     }
-
-    // Check if the order already has a delivery partner assigned
     if (
       order.deliveryPartner &&
       !order.deliveryPartner.equals(currentUser._id)
@@ -842,8 +839,6 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
         ),
       );
     }
-
-    // Assign the current delivery partner if none is assigned
     if (!order.deliveryPartner) {
       order.deliveryPartner = currentUser._id;
     }
@@ -851,13 +846,11 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
     newStatus === 'out-for-delivery' &&
     currentUser.role !== 'delivery-partner'
   ) {
-    return next(new AppError('You are not a delivery partner.', 404));
+    return next(new AppError('You are not a delivery partner.', 403));
   } else if (
     newStatus === 'ready-for-delivery' &&
     currentUser.role === 'delivery-partner'
   ) {
-    
-    // Check if the delivery partner is trying to change the status back to "ready-for-delivery"
     if (currentStatus !== 'out-for-delivery') {
       return next(
         new AppError(
@@ -866,12 +859,8 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
         ),
       );
     }
-
-    // Unassign the delivery partner when the order is moved back to "ready-for-delivery"
     order.deliveryPartner = undefined;
   } else {
-    // For all other roles and statuses, allow the status change
-    // (including delivery partners for statuses other than "out-for-delivery")
     if (currentStatus === 'delivered' && newStatus !== 'cancelled') {
       return next(
         new AppError('Cannot update the status of a delivered order', 400),
@@ -879,21 +868,40 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
     }
   }
 
-  // Update the current status and add to the status history
+  // Fetch the user and their device tokens
   const user = await User.findById(order.user);
-  const userDeviceTokens = user.deviceTokens;
-  console.log(user.email, userDeviceTokens);
-  if (userDeviceTokens) {
-    userDeviceTokens.map(async (token) => {
-      console.log(token);
+  const userDeviceTokens = user.deviceTokens || [];
+  console.log(`User: ${user.email}, Device Tokens: ${userDeviceTokens}`);
+
+  const validTokens = [];
+
+  for (const token of userDeviceTokens) {
+    try {
       await sendNotification(
         token,
         'Order status changed!',
         `Your order status has changed to ${newStatus}.`,
       );
-    });
+      validTokens.push(token); // Add valid tokens
+    } catch (err) {
+      console.error(`Error sending notification to token ${token}:`, err);
+
+      if (
+        err.errorInfo?.code === 'messaging/registration-token-not-registered'
+      ) {
+        console.log(`Removing invalid token: ${token}`);
+      } else {
+        console.log(`Token ${token} failed for other reasons, keeping it.`);
+        validTokens.push(token); // Keep other failing tokens
+      }
+    }
   }
 
+  // Update the user's deviceTokens with only valid tokens
+  user.deviceTokens = validTokens;
+  await user.save();
+
+  // Update the order status and status history
   order.status = newStatus;
   order.statusHistory.push({
     status: newStatus,

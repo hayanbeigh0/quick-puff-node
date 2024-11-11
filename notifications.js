@@ -11,13 +11,8 @@ const sendNotification = async (token, title, body) => {
     token: token, // Device token obtained from the client app
   };
 
-  console.log(message);
-  try {
-    const response = await messaging.send(message);
-    console.log('Notification sent successfully:', response);
-  } catch (error) {
-    console.log('Error sending notification:', error);
-  }
+  const response = await messaging.send(message);
+  console.log('Notification sent successfully:', response);
 };
 
 const sendNotificationToAllUsers = async (title, body) => {
