@@ -3,35 +3,37 @@ name: CI/CD to Google Cloud VM
 on:
   push:
     branches:
-      - main  # Adjust this to your deployment branch
+      - main # Adjust this to your deployment branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Start SSH Agent and Add SSH Key
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Start SSH Agent and Add SSH Key
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Deploy to VM
-      env:
-        HOST: 104.197.126.144
-        USERNAME: hayanbeigh
-      run: |
-        ssh -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << 'EOF'
-          # Navigate to your project directory
-          cd /home/hayanbeigh/quickpuff048/quick-puff-node
+      - name: Deploy to VM
+        env:
+          HOST: 34.44.225.81
+          USERNAME: quickpuf795
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << 'EOF'
+            # Navigate to your project directory
+            cd /home/quickpuf795/quick-puff-node
 
-          # Run deployment commands
-          git pull origin main
-          npm install
-          sudo killall -2 node
-          pm2 start server.js  # Start with pm2
-          pm2 save             # Save the pm2 process list
-          exit
-        EOF
+            # Run deployment commands
+            git pull origin main
+            npm install
+
+            # Start the app with a specific name (pm2 will handle it correctly now)
+            pm2 start server.js --name "server" || pm2 restart "server"
+
+            pm2 save  # Save the pm2 process list
+            exit
+          EOF
