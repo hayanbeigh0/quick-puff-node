@@ -1,39 +1,38 @@
-name: CI/CD to Google Cloud VM
+name: Deploy to Server
 
 on:
   push:
     branches:
-      - main # Adjust this to your deployment branch
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Start SSH Agent and Add SSH Key
-        uses: webfactory/ssh-agent@v0.5.3
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.1
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy to VM
-        env:
-          HOST: 34.44.225.81
-          USERNAME: quickpuf795
+      - name: Deploy Application
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ env.USERNAME }}@${{ env.HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no quickpuff795@34.44.225.81 << 'EOF'
             # Navigate to your project directory
-            cd /home/quickpuf795/quick-puff-node
+            cd /home/quickpuff795/quick-puff-node
 
-            # Run deployment commands
+            # Pull the latest code
             git pull origin main
+            
+            # Install dependencies
             npm install
 
-            # Start the app with a specific name (pm2 will handle it correctly now)
+            # Start or restart the app using PM2
             pm2 start server.js --name "server" || pm2 restart "server"
 
-            pm2 save  # Save the pm2 process list
-            exit
+            # Save the PM2 process list
+            pm2 save
           EOF
