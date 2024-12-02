@@ -105,15 +105,15 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('User not found or missing date of birth', 400));
   }
 
-  if (!user.idVerified) {
-    return next(
-      new AppError(
-        'User ID not verified!',
-        400,
-        ErrorCodes.USER_ID_NOT_VERIFIED.code,
-      ),
-    );
-  }
+  // if (!user.idVerified) {
+  //   return next(
+  //     new AppError(
+  //       'User ID not verified!',
+  //       400,
+  //       ErrorCodes.USER_ID_NOT_VERIFIED.code,
+  //     ),
+  //   );
+  // }
 
   const userAge = calculateAge(user.dateOfBirth);
   if (userAge < MINIMUM_AGE) {
