@@ -331,6 +331,75 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   });
 });
 
+const getAdditionalCharges = catchAsync(async (req, res, next) => {
+  const userId = req.user._id;
+  const user = await User.findById(userId).session(session);
+  if (!user || !user.dateOfBirth) {
+    return next(new AppError('User not found or missing date of birth', 400));
+  }
+  // 4. Retrieve the user's delivery address
+  const deliveryAddress = user.deliveryAddressLocations.find(
+    (address) => address.default === true,
+  );
+
+  if (!deliveryAddress || !deliveryAddress.coordinates) {
+    return next(new AppError('Invalid delivery address', 400));
+  }
+
+  const MAX_DISTANCE_KM = 100000;
+
+  console.log(deliveryAddress.coordinates);
+
+  // 5. Find the nearest fulfillment center to the user's delivery address
+  const nearestFulfillmentCenter = await FulfillmentCenter.findOne({
+    coordinates: {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: [
+            deliveryAddress.coordinates[1],
+            deliveryAddress.coordinates[0],
+          ], // User's delivery coordinates
+        },
+        $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
+      },
+    },
+  }).session(session);
+
+  console.log(nearestFulfillmentCenter);
+
+  if (!nearestFulfillmentCenter) {
+    return next(
+      new AppError(
+        'No fulfillment center available nearby',
+        404,
+        ErrorCodes.NO_NEAREST_FULLFILMENT_CENTER_FOUND.code,
+      ),
+    );
+  }
+
+  // 6. Calculate the distance between the fulfillment center and the user's delivery address
+  const distance = calculateDistance(
+    {
+      latitude: deliveryAddress.coordinates[1],
+      longitude: deliveryAddress.coordinates[0],
+    },
+    {
+      latitude: nearestFulfillmentCenter.coordinates[1],
+      longitude: nearestFulfillmentCenter.coordinates[0],
+    },
+  );
+
+  // 7. Calculate dynamic delivery and service fees based on distance
+  const deliveryFee = DELIVERY_FEE_BASE + distance * 0.5; // Add $0.5 per km
+  const serviceFee = SERVICE_FEE_BASE + (distance > 10 ? 2 : 0); // Add extra $2 if distance is > 10km
+  res.status(201).json({
+    status: 'success',
+    deliveryFee,
+    serviceFee,
+  });
+});
+
 const reorder = setTransaction(async (req, res, next, session) => {
   const userId = req.user._id;
   const previousOrderId = req.params.orderId;
@@ -932,4 +1001,5 @@ module.exports = {
   getOrdersOnDate,
   updateOrderStatus,
   reorder,
+  getAdditionalCharges,
 };
