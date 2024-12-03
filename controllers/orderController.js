@@ -364,7 +364,7 @@ const getAdditionalCharges = catchAsync(async (req, res, next) => {
         $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
       },
     },
-  }).session(session);
+  });
 
   console.log(nearestFulfillmentCenter);
 
