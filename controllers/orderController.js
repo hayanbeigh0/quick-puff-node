@@ -610,7 +610,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
     .session(session);
 
   // 15. Send the response with the new order details
-  res.status(201).json({
+  res.status(200).json({
     status: 'success',
     order: populatedOrder,
     deliveryTimeRange: deliveryTimeRange,
