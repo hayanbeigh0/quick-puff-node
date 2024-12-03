@@ -24,6 +24,6 @@ router
   .patch(orderController.updateOrderStatus);
 router
   .route('/additionalCharges')
-  .get(orderController.getOrder)
+  .get(orderController.getAdditionalCharges)
 
 module.exports = router;
