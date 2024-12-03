@@ -333,7 +333,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
 
 const getAdditionalCharges = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
-  const user = await User.findById(userId).session(session);
+  const user = await User.findById(userId);
   if (!user || !user.dateOfBirth) {
     return next(new AppError('User not found or missing date of birth', 400));
   }
