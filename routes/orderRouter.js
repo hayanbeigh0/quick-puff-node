@@ -22,5 +22,8 @@ router
   .route('/:id')
   .get(orderController.getOrder)
   .patch(orderController.updateOrderStatus);
+router
+  .route('/additionalCharges')
+  .get(orderController.getOrder)
 
 module.exports = router;
