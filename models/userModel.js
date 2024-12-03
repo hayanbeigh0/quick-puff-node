@@ -85,18 +85,18 @@ const userSchema = new mongoose.Schema(
     },
     idVerificationStatus: {
       type: String,
-      enum: ['pending', 'initiated', 'verified', 'rejected'], // Possible states for verification
-      default: 'pending', // Default status
+      enum: ['pending', 'initiated', 'verified', 'rejected'],
+      default: 'pending',
     },
     idVerifiedBy: {
-      type: mongoose.Schema.Types.ObjectId, // Stores admin ID who verified/rejected
-      ref: 'User', // Assuming admins are also users
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
     idVerificationDate: {
-      type: Date, // Stores the date of verification or rejection
+      type: Date,
     },
     idVerificationComment: {
-      type: String, // Optional comment left by the admin
+      type: String,
     },
     idVerified: {
       type: Boolean,
@@ -110,9 +110,9 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     deviceTokens: {
-      type: [String], // Store an array of tokens for multi-device support
+      type: [String],
     },
-    deliveryAddressLocations: [deliveryAddressLocationSchema], // Use the subdocument schema
+    deliveryAddressLocations: [deliveryAddressLocationSchema],
     active: { type: Boolean, default: true, select: false },
   },
   {
@@ -135,21 +135,39 @@ const userSchema = new mongoose.Schema(
   },
 );
 
-userSchema.index({ organisations: 1 });
-userSchema.index({ name: 1 });
+// Prevent operations on inactive users
+userSchema.pre('save', function (next) {
+  if (!this.active) {
+    const error = new Error('User is inactive and cannot be saved.');
+    return next(error);
+  }
+
+  if (this.firstName && this.lastName && this.phoneNumber && this.dateOfBirth) {
+    this.profileCompleted = true;
+  } else {
+    this.profileCompleted = false;
+  }
+  next();
+});
 
 userSchema.pre(/^find/, async function (next) {
   this.find({ active: { $ne: false } });
   next();
 });
 
-userSchema.pre('save', function (next) {
-  if (this.firstName && this.lastName && this.phoneNumber && this.dateOfBirth) {
-    this.profileCompleted = true;
-    return next();
+userSchema.pre('findOneAndUpdate', function (next) {
+  if (this._update.active === false) {
+    const error = new Error('Cannot update to inactive user.');
+    return next(error);
   }
+  next();
+});
 
-  this.profileCompleted = false;
+userSchema.pre('remove', function (next) {
+  if (!this.active) {
+    const error = new Error('Cannot delete an inactive user.');
+    return next(error);
+  }
   next();
 });
 

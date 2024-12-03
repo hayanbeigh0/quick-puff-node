@@ -171,7 +171,10 @@ const createOrder = setTransaction(async (req, res, next, session) => {
       $near: {
         $geometry: {
           type: 'Point',
-          coordinates: deliveryAddress.coordinates, // User's delivery coordinates
+          coordinates: [
+            deliveryAddress.coordinates[1],
+            deliveryAddress.coordinates[0],
+          ], // User's delivery coordinates
         },
         $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
       },

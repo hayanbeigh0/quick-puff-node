@@ -387,6 +387,17 @@ const updateDeviceToken = catchAsync(async (req, res) => {
   return;
 });
 
+const softDeleteUserAccount = catchAsync(async (req, res) => {
+  await User.findByIdAndUpdate(req.user._id, {
+    active: false,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Account deleted successfully!',
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -404,4 +415,5 @@ module.exports = {
   getDeviceTokens,
   cleanInvalidDeviceTokens,
   updateDeviceToken,
+  softDeleteUserAccount,
 };

@@ -6,7 +6,11 @@ const fileUploadController = require('../controllers/fileUploadController');
 
 const router = express.Router();
 
-router.route('/').patch(authController.protect, userController.updateProfile);
+router
+  .route('/')
+  .patch(authController.protect, userController.updateProfile)
+  .delete(authController.protect, userController.softDeleteUserAccount);
+  
 router
   .route('/currentUser')
   .get(authController.protect, userController.getCurrentUser);
@@ -46,7 +50,7 @@ router
   .route('/deviceToken')
   .post(authController.protect, userController.addDeviceToken)
   .get(authController.protect, userController.getDeviceTokens)
-  .delete(authController.protect, userController.removeDeviceToken)
+  .delete(authController.protect, userController.removeDeviceToken);
 
 router
   .route('/deviceToken/invalid')
