@@ -163,6 +163,8 @@ const createOrder = setTransaction(async (req, res, next, session) => {
 
   const MAX_DISTANCE_KM = 100000;
 
+  console.log(deliveryAddress.coordinates);
+
   // 5. Find the nearest fulfillment center to the user's delivery address
   const nearestFulfillmentCenter = await FulfillmentCenter.findOne({
     coordinates: {
