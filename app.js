@@ -85,10 +85,10 @@ app.use((req, res, next) => {
   const userAgent = req.headers['user-agent'];
 
   // Define app store URLs and deep link URL
-  const appStoreURL = 'https://testflight.apple.com/join/fwMRsTzw'; // Replace with your App Store URL
+  const appStoreURL = 'https://testflight.apple.com/join/fwMRsTzw'; // App Store URL
   const playStoreURL =
-    'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME'; // Replace with your Play Store URL
-  const deepLinkURL = 'yourappscheme://'; // Replace with your app's custom URL scheme
+    'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME'; // Play Store URL
+  const deepLinkURL = 'yourappscheme://'; // app's custom URL scheme
 
   // Check if the request path is intended for deep linking
   if (req.path.includes('api/v1')) {
