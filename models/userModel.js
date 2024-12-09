@@ -134,21 +134,40 @@ const userSchema = new mongoose.Schema(
     },
   },
 );
-userSchema.index({ organisations: 1 });
-userSchema.index({ name: 1 });
+
+// Prevent operations on inactive users
+userSchema.pre('save', function (next) {
+  if (!this.active) {
+    const error = new Error('User is inactive and cannot be saved.');
+    return next(error);
+  }
+
+  if (this.firstName && this.lastName && this.phoneNumber && this.dateOfBirth) {
+    this.profileCompleted = true;
+  } else {
+    this.profileCompleted = false;
+  }
+  next();
+});
 
 userSchema.pre(/^find/, async function (next) {
   this.find({ active: { $ne: false } });
   next();
 });
 
-userSchema.pre('save', function (next) {
-  if (this.firstName && this.lastName && this.phoneNumber && this.dateOfBirth) {
-    this.profileCompleted = true;
-    return next();
+userSchema.pre('findOneAndUpdate', function (next) {
+  if (this._update.active === false) {
+    const error = new Error('Cannot update to inactive user.');
+    return next(error);
   }
+  next();
+});
 
-  this.profileCompleted = false;
+userSchema.pre('remove', function (next) {
+  if (!this.active) {
+    const error = new Error('Cannot delete an inactive user.');
+    return next(error);
+  }
   next();
 });
 
