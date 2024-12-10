@@ -10,10 +10,12 @@ router
   .route('/')
   .patch(authController.protect, userController.updateProfile)
   .delete(authController.protect, userController.softDeleteUserAccount);
-  
+
 router
   .route('/currentUser')
-  .get(authController.protect, userController.getCurrentUser);
+  .get(authController.protect, userController.getCurrentUser)
+  .delete(authController.protect, userController.deleteUserAndReassignOrders);
+
 router
   .route('/myDeliveryAddressLocations')
   .post(authController.protect, userController.addDeliveryAddressLocations)

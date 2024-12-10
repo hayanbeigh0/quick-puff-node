@@ -1,8 +1,11 @@
 const User = require('../models/userModel');
+const Order = require('../models/orderModel');
+const Cart = require('../models/cartModel');
 
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const { uploadImage, getImageUrl } = require('../utils/cloudfs');
+const setTransaction = require('./transactionController');
 
 const updateProfile = catchAsync(async (req, res, next) => {
   const { firstName, lastName, dateOfBirth, phoneNumber } = req.body;
@@ -398,6 +401,33 @@ const softDeleteUserAccount = catchAsync(async (req, res) => {
   });
 });
 
+const deleteUserAndReassignOrders = setTransaction(async (req, res, next, session) => {
+  const userId = req.user._id;
+  const ghostUserId = '6720867c8c10a1a656c9dd97';
+
+  // Step 2: Reassign the user's orders to the ghost user
+  await Order.updateMany({ user: userId }, { $set: { user: ghostUserId } }).session(session);
+
+  // Step 3: Delete the user's cart
+  await Cart.deleteMany({ user: userId }).session(session);
+
+  // Step 4: Delete the user's delivery addresses (optional based on your requirements)
+  await User.updateOne(
+    { _id: userId },
+    { $set: { deliveryAddressLocations: [] } }
+  ).session(session);
+
+  // Step 5: Finally, delete the user
+  await User.deleteOne({ _id: userId }).session(session);
+
+  console.log(`User ${userId} deleted and data reassigned to ghost user.`);
+
+  return res.status(204).json({
+    status: 'success',
+    message: 'Account deleted successfully!',
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -416,4 +446,5 @@ module.exports = {
   cleanInvalidDeviceTokens,
   updateDeviceToken,
   softDeleteUserAccount,
+  deleteUserAndReassignOrders,
 };

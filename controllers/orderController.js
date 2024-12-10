@@ -281,6 +281,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     [
       {
         user: userId,
+        createdByEmail: req.user.email,
         orderNumber: orderNumber, // Assign the unique order number here
         items: cart.items.map((item) => ({
           product: item.product._id,
@@ -573,6 +574,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
     [
       {
         user: userId,
+        createdByEmail: req.user.email,
         orderNumber: orderNumber,
         items: newItems,
         deliveryAddress: deliveryAddress,
