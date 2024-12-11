@@ -13,33 +13,48 @@ const RecentSearch = require('../models/recentSearchModel');
 
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
-  // Ensure that either puff or volume is provided, but not both at the same time
-  if (
-    (req.body.puff != null && req.body.volume != null) || // Both are set
-    (req.body.puff == null && req.body.volume == null)    // Neither is set
-  ) {
-    return next(
-      new AppError(
-        'Either puff or volume must be provided, but not both.',
-        400
-      )
-    );
-  }
+  console.log(req.body);
+  const parseQuantity = (value, unit) => {
+    if (!value || !unit) return null;
+    return { value: parseFloat(value), unit: unit.trim() };
+  };
+
+  const parseQuantityOptions = (options) => {
+    if (!Array.isArray(options)) return [];
+    return options.map((option) => {
+      if (typeof option === 'string') {
+        try {
+          // Parse the string into an object
+          const parsedOption = JSON.parse(option);
+          return {
+            value: parseFloat(parsedOption.value),
+            unit: parsedOption.unit.trim(),
+          };
+        } catch (err) {
+          throw new AppError('Invalid quantityOptions format', 400);
+        }
+      } else if (typeof option === 'object' && option !== null) {
+        return {
+          value: parseFloat(option.value),
+          unit: option.unit.trim(),
+        };
+      }
+      throw new AppError('Invalid quantityOptions format', 400);
+    });
+  };
+
+
+  // Parse quantity and quantityOptions
+  const quantity = parseQuantity(req.body.quantityValue, req.body.quantityUnit);
+  const quantityOptions = parseQuantityOptions(req.body.quantityOptions);
 
   // Convert string values to numbers where necessary
-  const parseArrayToNumbers = (array) =>
-    array ? array.map(option => parseInt(option, 10)) : null;
-
-  const parseNumber = (value) => (value ? parseFloat(value) : null);
-
-  const price = parseNumber(req.body.price);
-  const oldPrice = parseNumber(req.body.oldPrice);
-  const stock = parseNumber(req.body.stock);
-  const puff = parseNumber(req.body.puff);
-  const puffOptions = parseArrayToNumbers(req.body.puffOptions);
-  const volume = parseNumber(req.body.volume);
-  const volumeOptions = parseArrayToNumbers(req.body.volumeOptions);
-  const nicotineStrength = parseNumber(req.body.nicotineStrength);
+  const price = req.body.price ? parseFloat(req.body.price) : null;
+  const oldPrice = req.body.oldPrice ? parseFloat(req.body.oldPrice) : null;
+  const stock = req.body.stock ? parseInt(req.body.stock, 10) : null;
+  const nicotineStrength = req.body.nicotineStrength
+    ? parseInt(req.body.nicotineStrength, 10)
+    : null;
 
   // Proceed with product creation after file upload
   const publicId = await uploadImage(req.file, 'products');
@@ -60,10 +75,8 @@ const createProduct = catchAsync(async (req, res, next) => {
     ingredients: req.body.ingredients, // Handle comma-separated string
     nicotineStrength,
     nicotineStrengthOptions: req.body.nicotineStrengthOptions,
-    puff: puff || null, // Include only if present
-    puffOptions: puffOptions || null, // Include only if present
-    volume: volume || null, // Include only if present
-    volumeOptions: volumeOptions || null, // Include only if present
+    quantity: quantity || null, // Unified quantity field
+    quantityOptions: quantityOptions.length > 0 ? quantityOptions : null, // Optional quantity options
   };
 
   // Create the product
@@ -78,14 +91,9 @@ const createProduct = catchAsync(async (req, res, next) => {
   });
 });
 
-
 // Controller function to handle product update
 const updateProduct = catchAsync(async (req, res, next) => {
   const { id } = req.body;
-
-  if (req.body.puff && req.body.volume) {
-    return next(new AppError('Either puff or volume must be provided.', 400));
-  }
 
   // Find the product by ID
   const product = await Product.findById(id);
@@ -106,6 +114,41 @@ const updateProduct = catchAsync(async (req, res, next) => {
     assetInfo = getImageUrl(publicId);
   }
 
+  // Helper function to parse quantity
+  const parseQuantity = (value, unit) => {
+    if (!value || !unit) return null;
+    return { value: parseFloat(value), unit: unit.trim() };
+  };
+
+  // Helper function to parse quantity options
+  const parseQuantityOptions = (options) => {
+    if (!Array.isArray(options)) return [];
+    return options.map((option) => {
+      if (typeof option === 'string') {
+        try {
+          // Parse the string into an object
+          const parsedOption = JSON.parse(option);
+          return {
+            value: parseFloat(parsedOption.value),
+            unit: parsedOption.unit.trim(),
+          };
+        } catch (err) {
+          throw new AppError('Invalid quantityOptions format', 400);
+        }
+      } else if (typeof option === 'object' && option !== null) {
+        return {
+          value: parseFloat(option.value),
+          unit: option.unit.trim(),
+        };
+      }
+      throw new AppError('Invalid quantityOptions format', 400);
+    });
+  };
+
+  // Parse the quantity and quantityOptions
+  const quantity = parseQuantity(req.body.quantityValue, req.body.quantityUnit);
+  const quantityOptions = parseQuantityOptions(req.body.quantityOptions);
+
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
     id,
@@ -113,30 +156,29 @@ const updateProduct = catchAsync(async (req, res, next) => {
       name: req.body.name || product.name,
       image: assetInfo,
       description: req.body.description || product.description,
-      price: +req.body.price || product.price,
-      oldPrice: +req.body.oldPrice || product.oldPrice,
-      stock: req.body.stock || product.stock,
-      puff:
-        req.body.puff !== undefined
-          ? +req.body.puff
-          : req.body.volume
-            ? null
-            : product.puff, // Set puff or null
-      volume:
-        req.body.volume !== undefined
-          ? +req.body.volume
-          : req.body.puff
-            ? null
-            : product.volume, // Set volume or null
+      price: req.body.price ? parseFloat(req.body.price) : product.price,
+      oldPrice: req.body.oldPrice ? parseFloat(req.body.oldPrice) : product.oldPrice,
+      stock: req.body.stock ? parseInt(req.body.stock, 10) : product.stock,
       productCategory: req.body.productCategory || product.productCategory,
       brand: req.body.brand || product.brand,
       flavor: req.body.flavor || product.flavor,
-      nicotineStrength: +req.body.nicotineStrength || product.nicotineStrength,
-      soldCount: +req.body.soldCount || product.soldCount,
-      reviewCount: +req.body.reviewCount || product.reviewCount,
-      averageRating: +req.body.averageRating || product.averageRating,
-      viewCount: +req.body.viewCount || product.viewCount,
-      wishlistCount: +req.body.wishlistCount || product.wishlistCount,
+      nicotineStrength: req.body.nicotineStrength
+        ? parseInt(req.body.nicotineStrength, 10)
+        : product.nicotineStrength,
+      soldCount: req.body.soldCount ? parseInt(req.body.soldCount, 10) : product.soldCount,
+      reviewCount: req.body.reviewCount
+        ? parseInt(req.body.reviewCount, 10)
+        : product.reviewCount,
+      averageRating: req.body.averageRating
+        ? parseFloat(req.body.averageRating)
+        : product.averageRating,
+      viewCount: req.body.viewCount ? parseInt(req.body.viewCount, 10) : product.viewCount,
+      wishlistCount: req.body.wishlistCount
+        ? parseInt(req.body.wishlistCount, 10)
+        : product.wishlistCount,
+      quantity: quantity || product.quantity,
+      quantityOptions:
+        quantityOptions.length > 0 ? quantityOptions : product.quantityOptions,
     },
     {
       new: true, // Return the updated document
@@ -169,7 +211,7 @@ const getProduct = catchAsync(async (req, res, next) => {
 
 const getProductPrice = catchAsync(async (req, res, next) => {
   const { productId } = req.params;
-  const { puff, flavor, volume, nicotineStrength } = req.body;
+  const { quantityValue, quantityUnit, flavor, nicotineStrength } = req.body;
 
   // 1. Find the product by ID
   const product = await Product.findById(productId);
@@ -181,29 +223,28 @@ const getProductPrice = catchAsync(async (req, res, next) => {
   // 2. Set the base price to the product price
   let finalPrice = product.price;
 
-  // 3. Adjust price based on puffOptions if provided
-  if (puff) {
-    if (!product.puffOptions.includes(puff)) {
-      return next(new AppError('Invalid puff option', 400));
+  // 3. Adjust price based on quantity options if provided
+  if (quantityValue && quantityUnit) {
+    const matchingOption = product.quantityOptions.find(
+      (option) =>
+        option.value === parseFloat(quantityValue) &&
+        option.unit === quantityUnit.trim()
+    );
+
+    if (!matchingOption) {
+      return next(new AppError('Invalid quantity option', 400));
     }
-    // Example: Add $5 if puff option is 5000 or more
-    if (puff >= 5000) {
+
+    // Example: Add $5 if quantity value is 5000 or more (for puffs) or 20 or more (for ml)
+    if (
+      (quantityUnit.trim() === 'puffs' && quantityValue >= 5000) ||
+      (quantityUnit.trim() === 'ml' && quantityValue >= 20)
+    ) {
       finalPrice += 5;
     }
   }
 
-  // 4. Adjust price based on volumeOptions if provided
-  if (volume) {
-    if (!product.volumeOptions.includes(volume)) {
-      return next(new AppError('Invalid volume option', 400));
-    }
-    // Example: Add $3 if volume option is 100ml or more
-    if (volume >= 20) {
-      finalPrice += 3;
-    }
-  }
-
-  // 5. Adjust price based on nicotineStrength if provided
+  // 4. Adjust price based on nicotineStrength if provided
   if (nicotineStrength) {
     if (!product.nicotineStrengthOptions.includes(nicotineStrength)) {
       return next(new AppError('Invalid nicotine strength option', 400));
@@ -214,9 +255,8 @@ const getProductPrice = catchAsync(async (req, res, next) => {
     }
   }
 
-  // 6. Adjust price based on flavorOptions if provided
+  // 5. Adjust price based on flavorOptions if provided
   if (flavor) {
-    console.log(product.flavorOptions);
     if (!product.flavorOptions.includes(flavor)) {
       return next(new AppError('Invalid flavor option', 400));
     }
@@ -224,14 +264,14 @@ const getProductPrice = catchAsync(async (req, res, next) => {
     finalPrice += 1;
   }
 
-  // 7. Send response with the final calculated price
+  // 6. Send response with the final calculated price
   res.status(200).json({
     status: 'success',
     data: {
       productId: product.id,
       basePrice: product.price,
       finalPrice,
-      selectedOptions: { puff, flavor, volume, nicotineStrength },
+      selectedOptions: { quantityValue, quantityUnit, flavor, nicotineStrength },
     },
   });
 });
@@ -288,8 +328,7 @@ const searchProducts = catchAsync(async (req, res, next) => {
               name: 1,
               image: 1,
               price: 1,
-              puff: 1,
-              volume: 1,
+              // quantity: 1,
               stock: 1,
               nicotineStrength: 1,
               // flavor: 1,
@@ -379,8 +418,7 @@ const getPopularProducts = catchAsync(async (req, res, next) => {
         name: 1,
         image: 1,
         price: 1,
-        puff: 1,
-        volume: 1,
+        // quantity: 1,
         stock: 1,
         nicotineStrength: 1,
         // flavor: 1,
@@ -415,7 +453,6 @@ const getPopularProducts = catchAsync(async (req, res, next) => {
 
 const getProductFilter = catchAsync(async (req, res, next) => {
   const predefinedPuffs = [2500, 5000, 6000, 6500, 7000];
-  const predefinedNicotineStrengths = [3, 6, 9, 12, 30, 50];
 
   const { brandId, categoryId } = req.params; // Get brandId and categoryId from req.params
 
@@ -428,7 +465,7 @@ const getProductFilter = catchAsync(async (req, res, next) => {
     },
     {
       $facet: {
-        // Flavors
+        // Flavors remain unchanged
         flavors: [
           {
             $lookup: {
@@ -486,12 +523,17 @@ const getProductFilter = catchAsync(async (req, res, next) => {
           },
         ],
 
-        // Predefined puff options
+        // Puff-related logic to handle quantities directly
         maxPuffs: [
           {
+            $match: {
+              'quantity.unit': 'puffs', // Match only quantities with the unit 'puffs'
+            },
+          },
+          {
             $group: {
-              _id: '$puff',
-              count: { $sum: 1 },
+              _id: '$quantity.value', // Group by the puff value from quantity
+              count: { $sum: 1 }, // Count occurrences of each puff value
             },
           },
           {
@@ -587,8 +629,8 @@ const getProductFilter = catchAsync(async (req, res, next) => {
     status: 'success',
     filters: {
       flavor: filters[0].flavors,
-      maxPuffs: filters[0].maxPuffs[0].puffs,
-      nicotineStrength: filters[0].nicotineStrength,
+      maxPuffs: filters[0].maxPuffs[0]?.puffs || [],
+      nicotineStrength: filters[0].nicotineStrength || [],
     },
   });
 });
