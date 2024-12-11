@@ -36,66 +36,6 @@ mongoose
     console.log(err);
   });
 
-// const migrateProducts = async () => {
-//   try {
-//     console.log('Starting migration...');
-
-//     // Set up the quantity transformation pipeline
-//     const updatePipeline = [
-//       {
-//         $set: {
-//           // Set the `quantity` field based on `puff` or `volume`
-//           quantity: {
-//             $cond: [
-//               { $ne: ['$puff', null] },
-//               { value: '$puff', unit: 'puffs' },
-//               {
-//                 $cond: [
-//                   { $ne: ['$volume', null] },
-//                   { value: '$volume', unit: 'ml' },
-//                   null,
-//                 ],
-//               },
-//             ],
-//           },
-
-//           // Set the `quantityOptions` field, including the main quantity
-//           quantityOptions: {
-//             $cond: [
-//               { $ne: ['$puff', null] },
-//               [{ value: '$puff', unit: 'puffs' }],
-//               {
-//                 $cond: [
-//                   { $ne: ['$volume', null] },
-//                   [{ value: '$volume', unit: 'ml' }],
-//                   [],
-//                 ],
-//               },
-//             ],
-//           },
-//         },
-//       },
-//       {
-//         $unset: ['puff', 'puffOptions', 'volume', 'volumeOptions'], // Remove old fields
-//       },
-//     ];
-
-//     // Apply the update to all products
-//     const result = await Product.updateMany({}, updatePipeline);
-
-//     console.log(`Migration completed. Modified ${result.modifiedCount} products.`);
-//   } catch (error) {
-//     console.error('Migration error:', error);
-//   } finally {
-//     mongoose.connection.close();
-//   }
-// };
-
-// // Run the migration script
-// migrateProducts();
-
-
-
 // CONFIGURE SERVER (HTTP & HTTPS)
 const http_server = http.createServer(app);
 
