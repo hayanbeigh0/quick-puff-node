@@ -55,7 +55,7 @@ const productSchema = new mongoose.Schema(
           // Check if either puff or volume is set, but not both
           return this.volume == null || v == null;
         },
-        message: 'Either puff or volume should be set, not both.',
+        message: 'Either puff options or volume options should be set, not both.',
       },
     },
     volume: {
@@ -68,7 +68,7 @@ const productSchema = new mongoose.Schema(
           // Check if either volume or puff is set, but not both
           return this.puff == null || v == null;
         },
-        message: 'Either puff or volume should be set, not both.',
+        message: 'Either volume or puff should be set, not both.',
       },
     },
     volumeOptions: {
@@ -81,7 +81,7 @@ const productSchema = new mongoose.Schema(
           // Check if either puff or volume is set, but not both
           return this.puff == null || v == null;
         },
-        message: 'Either puff or volume should be set, not both.',
+        message: 'Either volume options or puff options should be set, not both.',
       },
     },
     nicotineStrength: {

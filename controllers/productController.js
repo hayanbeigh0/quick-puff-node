@@ -15,52 +15,59 @@ const RecentSearch = require('../models/recentSearchModel');
 const createProduct = catchAsync(async (req, res, next) => {
   // Ensure that either puff or volume is provided, but not both at the same time
   if (
-    (req.body.puff && req.body.volume) ||
-    (!req.body.puff && !req.body.volume)
+    (req.body.puff != null && req.body.volume != null) || // Both are set
+    (req.body.puff == null && req.body.volume == null)    // Neither is set
   ) {
     return next(
       new AppError(
         'Either puff or volume must be provided, but not both.',
-        400,
-      ),
+        400
+      )
     );
   }
 
-  // Log the puff and volume arrays if they exist
-  if (req.body.puff) {
-    console.log('Puff:', req.body.puff);
-  }
-  if (req.body.volume) {
-    console.log('Volume:', req.body.volume);
-  }
+  // Convert string values to numbers where necessary
+  const parseArrayToNumbers = (array) =>
+    array ? array.map(option => parseInt(option, 10)) : null;
 
-  // Check if puff or volume is an empty array and set it to null if empty
-  const puff =
-    Array.isArray(req.body.puff) && req.body.puff.length > 0
-      ? req.body.puff
-      : null;
-  const volume =
-    Array.isArray(req.body.volume) && req.body.volume.length > 0
-      ? req.body.volume
-      : null;
+  const parseNumber = (value) => (value ? parseFloat(value) : null);
+
+  const price = parseNumber(req.body.price);
+  const oldPrice = parseNumber(req.body.oldPrice);
+  const stock = parseNumber(req.body.stock);
+  const puff = parseNumber(req.body.puff);
+  const puffOptions = parseArrayToNumbers(req.body.puffOptions);
+  const volume = parseNumber(req.body.volume);
+  const volumeOptions = parseArrayToNumbers(req.body.volumeOptions);
+  const nicotineStrength = parseNumber(req.body.nicotineStrength);
 
   // Proceed with product creation after file upload
   const publicId = await uploadImage(req.file, 'products');
   const assetInfo = getImageUrl(publicId);
 
-  // Create the product with the image URL
-  const product = await Product.create({
+  // Create the product data dynamically
+  const productData = {
     name: req.body.name,
     image: assetInfo, // Store the image URL in the image property
     description: req.body.description,
-    price: req.body.price,
-    oldPrice: req.body.oldPrice,
-    stock: req.body.stock,
-    puff: puff, // Set to null if empty
-    volume: volume, // Set to null if empty
+    price, // Use parsed number
+    oldPrice, // Use parsed number
+    stock, // Use parsed number
     productCategory: req.body.productCategory,
     brand: req.body.brand,
-  });
+    flavor: req.body.flavor,
+    flavorOptions: req.body.flavorOptions, // Handle stringified arrays
+    ingredients: req.body.ingredients, // Handle comma-separated string
+    nicotineStrength,
+    nicotineStrengthOptions: req.body.nicotineStrengthOptions,
+    puff: puff || null, // Include only if present
+    puffOptions: puffOptions || null, // Include only if present
+    volume: volume || null, // Include only if present
+    volumeOptions: volumeOptions || null, // Include only if present
+  };
+
+  // Create the product
+  const product = await Product.create(productData);
 
   // Respond with the newly created product
   res.status(201).json({
@@ -70,6 +77,7 @@ const createProduct = catchAsync(async (req, res, next) => {
     },
   });
 });
+
 
 // Controller function to handle product update
 const updateProduct = catchAsync(async (req, res, next) => {
