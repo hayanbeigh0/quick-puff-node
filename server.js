@@ -7,7 +7,6 @@ const app = require('./app');
 const { initialiseSocketIo } = require('./socket/index');
 
 const socketIo = require('socket.io');
-const Product = require('./models/productModel');
 
 const cloudinary = require('cloudinary').v2;
 
