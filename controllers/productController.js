@@ -11,6 +11,40 @@ const {
 } = require('../utils/cloudfs');
 const RecentSearch = require('../models/recentSearchModel');
 
+const Brand = require('../models/brandModel');
+const BrandCategory = require('../models/brandCategoryModel');
+const ProductCategory = require('../models/productCategoryModel');
+
+// Middleware to validate brand, productCategory, and brandCategory relationship
+const validateProductData = catchAsync(async (req, res, next) => {
+  const { brand, productCategory } = req.body;
+
+  // Step 1: Validate if the brand exists
+  const brandExists = await Brand.findById(brand);
+  if (!brandExists) {
+    return next(new AppError('Brand does not exist', 404));
+  }
+
+  // Step 2: Check if the productCategory exists
+  const productCategoryExists = await ProductCategory.findById(productCategory);
+  if (!productCategoryExists) {
+    return next(new AppError('ProductCategory does not exist', 404));
+  }
+
+  // Step 3: Check if the brand is associated with any BrandCategory that links to the ProductCategory
+  const validBrandCategoryFound = await BrandCategory.findOne({
+    _id: { $in: brandExists.categories },
+    productCategories: { $in: [productCategory] }
+  });
+
+  if (!validBrandCategoryFound) {
+    return next(new AppError('No valid BrandCategory linked to the ProductCategory for this Brand', 400));
+  }
+
+  // If all validations pass, proceed to the next middleware or route handler
+  next();
+});
+
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
   console.log(req.body);
@@ -649,4 +683,5 @@ module.exports = {
   getProductFilter,
   getProduct,
   getProductPrice,
+  validateProductData
 };
