@@ -8,6 +8,7 @@ const {
   deleteImage,
   extractPublicIdFromUrl,
 } = require('../utils/cloudfs');
+const APIFeatures = require('../utils/apiFeatures');
 
 // Controller function to handle brand creation
 const createBrand = catchAsync(async (req, res, next) => {
@@ -99,7 +100,50 @@ const deleteBrand = catchAsync(async (req, res, next) => {
   });
 });
 
-const getBrands = factory.getAll(Brand);
+// The function to get brands with pagination
+const getBrands = catchAsync(async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if no page param is provided
+  const limit = parseInt(req.query.limit) || 10; // Default to 10 results per page if no limit param is provided
+
+  // Calculate the number of documents to skip based on the current page and page size
+  const skip = (page - 1) * limit;
+
+  // Get total count of brands
+  const totalBrands = await Brand.countDocuments();
+
+  // Find brands with populated categories and productCategories, and apply pagination
+  const brands = await Brand.find()
+    .skip(skip)
+    .limit(limit)
+    .populate({
+      path: 'categories',
+      select: '-__v',
+      populate: {
+        path: 'productCategories',
+        model: 'ProductCategory', // Make sure to replace with the correct model name for ProductCategory
+        select: '-__v',
+      },
+    }).select('-__v')
+    .exec();
+
+  // Calculate total pages
+  const totalPages = Math.ceil(totalBrands / limit);
+
+  // Return paginated results with page info
+  res.status(200).json({
+    status: 'success',
+    brands,
+    pageInfo: {
+      page: page,
+      limit: limit,
+      totalPages: totalPages,
+      totalItems: totalBrands,
+    },
+  });
+});
+
+
+
 
 // Export middleware and controller functions
 module.exports = {
