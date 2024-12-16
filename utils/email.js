@@ -101,7 +101,7 @@ const sendEmail = async (options) => {
   // Configure the email details
   const mailOptions = {
     to: options.email, // Recipient email
-    from: '"quickpuff795@gmail.com', // Sender email
+    from: '"Quick Puff quickpuff795@gmail.com', // Sender email
     subject: options.subject, // Email subject
     text: emailText, // Plaintext version of email
     html: emailHtml, // HTML version of email
