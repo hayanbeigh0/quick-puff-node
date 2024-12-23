@@ -844,7 +844,7 @@ const cancelOrder = setTransaction(async (req, res, next, session) => {
   if (order.status === 'delivered' || order.status === 'processing') {
     return next(
       new AppError(
-        'This order cannot be canceled because it has already been delivered or is being processed',
+        'This order cannot be cancelled because it has already been delivered or is being processed',
         400,
       ),
     );
@@ -858,7 +858,7 @@ const cancelOrder = setTransaction(async (req, res, next, session) => {
   }
 
   // 4. Mark the order as canceled
-  order.status = 'canceled';
+  order.status = 'cancelled';
   await order.save();
 
   // 5. Optionally clear the cart if you want to restore the items for the user
