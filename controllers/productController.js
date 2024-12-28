@@ -14,6 +14,7 @@ const RecentSearch = require('../models/recentSearchModel');
 const Brand = require('../models/brandModel');
 const BrandCategory = require('../models/brandCategoryModel');
 const ProductCategory = require('../models/productCategoryModel');
+const APIFeatures = require('../utils/apiFeatures');
 
 // Middleware to validate brand, productCategory, and brandCategory relationship
 const validateProductData = catchAsync(async (req, res, next) => {
@@ -669,7 +670,47 @@ const getProductFilter = catchAsync(async (req, res, next) => {
   });
 });
 
-const getProducts = factory.getAll(Product);
+const getProducts = catchAsync(async (req, res, next) => {
+  let filter = {};
+  if (req.params.productId) filter = { product: req.params.productId };
+
+  // Build the query
+  let query = Product.find(filter);
+
+  // Apply API Features like filtering, sorting, limiting fields, and pagination
+  const features = new APIFeatures(query, req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+
+  let data = await features.query;
+
+  // Populate related fields
+  data = await Product.populate(data, [
+    { path: 'flavor', select: 'name _id' },
+    { path: 'flavorOptions', select: 'name _id' },
+    { path: 'brand', select: 'name _id' },
+    { path: 'productCategory', select: 'name _id' }
+  ]);
+
+  const totalItems = await Product.countDocuments(filter);
+  const limit = features.queryString.limit * 1 || 100;
+  const page = features.queryString.page * 1 || 1;
+  const totalPages = Math.ceil(totalItems / limit);
+
+  res.status(200).json({
+    status: 'success',
+    results: data.length,
+    products: data,
+    pageInfo: {
+      page,
+      limit,
+      totalPages,
+      totalItems
+    },
+  });
+});
 
 // Export middleware and controller functions
 module.exports = {
