@@ -22,5 +22,6 @@ router
 router
   .route('/:brandId')
   .delete(authController.protect, brandController.deleteBrand);
+router.get('/:brandId', brandController.getBrandById);
 
 module.exports = router;

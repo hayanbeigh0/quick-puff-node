@@ -63,6 +63,7 @@ const updateBrand = catchAsync(async (req, res, next) => {
       name: req.body.name || brand.name,
       image: assetInfo,
       categories: req.body.categories || brand.categories,
+      description: req.body.description || brand.description,
     },
     {
       new: true, // Return the updated document
@@ -142,8 +143,32 @@ const getBrands = catchAsync(async (req, res, next) => {
   });
 });
 
+const getBrandById = catchAsync(async (req, res, next) => {
+  const { brandId } = req.params;
 
+  const brand = await Brand.findById(brandId)
+    .populate({
+      path: 'categories',
+      select: '-__v',
+      populate: {
+        path: 'productCategories',
+        model: 'ProductCategory',
+        select: '-__v',
+      },
+    })
+    .select('-__v');
 
+  if (!brand) {
+    return next(new AppError('No brand found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      brand,
+    },
+  });
+});
 
 // Export middleware and controller functions
 module.exports = {
@@ -151,4 +176,5 @@ module.exports = {
   deleteBrand,
   getBrands,
   updateBrand,
+  getBrandById,
 };
