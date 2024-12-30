@@ -58,4 +58,11 @@ router
   .route('/deviceToken/invalid')
   .patch(authController.protect, userController.cleanInvalidDeviceTokens);
 
+router
+  .route('/myDeliveryAddressLocations/deleteMultiple')
+  .delete(
+    authController.protect,
+    userController.removeMultipleDeliveryAddressLocations,
+  );
+
 module.exports = router;

@@ -428,6 +428,34 @@ const deleteUserAndReassignOrders = setTransaction(async (req, res, next, sessio
   });
 });
 
+const removeMultipleDeliveryAddressLocations = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  const { deliveryLocationIds } = req.body;
+
+  if (!Array.isArray(deliveryLocationIds) || deliveryLocationIds.length === 0) {
+    return next(new AppError('Please provide an array of delivery location IDs', 400));
+  }
+
+  // Filter out the addresses that match the provided IDs
+  user.deliveryAddressLocations = user.deliveryAddressLocations.filter(
+    (location) => !deliveryLocationIds.includes(location._id.toString())
+  );
+
+  const updatedUser = await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      deliveryAddressLocations: updatedUser.deliveryAddressLocations,
+    },
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -447,4 +475,5 @@ module.exports = {
   updateDeviceToken,
   softDeleteUserAccount,
   deleteUserAndReassignOrders,
+  removeMultipleDeliveryAddressLocations,
 };
