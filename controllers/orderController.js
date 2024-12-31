@@ -553,7 +553,7 @@ const reorder = setTransaction(async (req, res, next, session) => {
         serviceFee: serviceFee,
         deliveryFee: deliveryFee,
         trackingNumber: req.body.trackingNumber || '',
-        status: req.body.paymentMethod === 'credit_card' ? 'awaitingpayment' : 'pending',
+        status: req.body.paymentMethod === 'credit_card' ? 'awaiting-payment' : 'pending',
         statusHistory: [{
           status: req.body.paymentMethod === 'credit_card' ? 'awaiting-payment' : 'pending',
           changedAt: new Date()
