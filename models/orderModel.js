@@ -90,8 +90,8 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
-      default: 'pending',
+      enum: ['pending', 'paid', 'failed', 'not_required'],
+      default: 'not_required'
     },
     transactionId: String,
     tipAmount: {
@@ -141,6 +141,9 @@ const orderSchema = new mongoose.Schema(
     ],
     deliveredAt: Date,
     orderNotes: String,
+    paymentIntentId: {
+      type: String,
+    },
   },
   {
     timestamps: true,
