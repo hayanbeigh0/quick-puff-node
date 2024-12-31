@@ -271,9 +271,9 @@ const createOrder = setTransaction(async (req, res, next, session) => {
       totalPrice: totalPrice,
       serviceFee: serviceFee,
       deliveryFee: deliveryFee,
-      status: 'awaiting_payment',
+      status: 'awaiting-payment',
       statusHistory: [{ 
-        status: 'awaiting_payment', 
+        status: 'awaiting-payment', 
         changedAt: new Date() 
       }],
       deliveryTimeRange: deliveryTimeRange,
