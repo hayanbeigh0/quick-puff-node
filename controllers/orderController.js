@@ -27,7 +27,6 @@ const calculateAge = (dob) => {
 const DELIVERY_FEE_BASE = 5; // Base fee for delivery
 const SERVICE_FEE_BASE = 1.5; // Base fee for service
 const MIN_DELIVERY_AMOUNT = 15;
-const RAZORPAY_SECRET = '<RAZORPAY_SECRET>';
 
 // Hardcoded seller's location (longitude, latitude)
 const sellerLocation = {
@@ -79,24 +78,6 @@ const generateUniqueOrderNumber = async () => {
   }
 
   return orderNumber; // Return the unique order number
-};
-
-const verifyPayment = async (paymentGatewayResponse) => {
-  // Depending on the gateway, you will verify the payment.
-  // Example with Razorpay:
-  const { paymentId, orderId, signature } = paymentGatewayResponse;
-
-  // Razorpay signature verification example (pseudo code):
-  const generatedSignature = crypto
-    .createHmac('sha256', RAZORPAY_SECRET)
-    .update(orderId + '|' + paymentId)
-    .digest('hex');
-
-  if (generatedSignature !== signature) {
-    throw new AppError('Payment verification failed', 400);
-  }
-
-  return true;
 };
 
 // Helper function to create Stripe payment intent
@@ -268,70 +249,36 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   // 10. Calculate the final total price including delivery and service fees
   let totalPrice = productTotalPrice + deliveryFee + serviceFee;
 
-  // Handle payment intent creation if payment method is credit card
-  let paymentIntent = null;
-  if (req.body.paymentMethod === 'credit_card') {
-    try {
-      paymentIntent = await createPaymentIntent(totalPrice);
-    } catch (error) {
-      return next(new AppError('Error creating payment: ' + error.message, 400));
-    }
-  }
-
   // Generate order number
   const orderNumber = await generateUniqueOrderNumber();
 
-  // 12. Set payment details based on the payment method
-  let paymentStatus = 'pending'; // For 'cash_on_delivery' or 'credit_card_on_delivery'
-  let transactionId = null;
-
-  if (req.body.paymentMethod === 'credit_card') {
-    // Verify the payment if it's a credit card payment
-    const paymentVerified = await verifyPayment(
-      req.body.paymentGatewayResponse,
-    );
-
-    if (!paymentVerified) {
-      return next(new AppError('Payment verification failed', 400));
+  // Create the order without payment intent
+  const newOrder = await Order.create([
+    {
+      user: userId,
+      createdByEmail: req.user.email,
+      orderNumber: orderNumber,
+      items: cart.items.map((item) => ({
+        product: item.product._id,
+        quantity: item.quantity,
+      })),
+      deliveryAddress: deliveryAddress,
+      fromAddress: nearestFulfillmentCenter,
+      paymentMethod: req.body.paymentMethod,
+      paymentStatus: 'pending',
+      tipAmount: tipAmount,
+      promoCode: promoCode,
+      totalPrice: totalPrice,
+      serviceFee: serviceFee,
+      deliveryFee: deliveryFee,
+      status: 'awaiting_payment',
+      statusHistory: [{ 
+        status: 'awaiting_payment', 
+        changedAt: new Date() 
+      }],
+      deliveryTimeRange: deliveryTimeRange,
     }
-
-    paymentStatus = 'paid';
-    transactionId = req.body.transactionId; // Set transaction ID for successful card payments
-  }
-
-  // 13. Create the order and set all relevant fields, including deliveryTimeRange and fromAddress
-  const newOrder = await Order.create(
-    [
-      {
-        user: userId,
-        createdByEmail: req.user.email,
-        orderNumber: orderNumber, // Assign the unique order number here
-        items: cart.items.map((item) => ({
-          product: item.product._id,
-          quantity: item.quantity,
-        })),
-        deliveryAddress: deliveryAddress,
-        fromAddress: nearestFulfillmentCenter, // Set the nearest fulfillment center as fromAddress
-        paymentMethod: req.body.paymentMethod,
-        paymentStatus: req.body.paymentMethod === 'credit_card' ? 'pending' : 'not_required',
-        paymentIntentId: paymentIntent?.id, // Store payment intent ID
-        tipAmount: tipAmount,
-        promoCode: promoCode,
-        totalPrice: totalPrice,
-        serviceFee: serviceFee,
-        deliveryFee: deliveryFee,
-        trackingNumber: req.body.trackingNumber || '', // Set tracking number if available
-        status: req.body.paymentMethod === 'credit_card' ? 'awaiting_payment' : 'pending',
-        statusHistory: [{ 
-          status: req.body.paymentMethod === 'credit_card' ? 'awaiting_payment' : 'pending', 
-          changedAt: new Date() 
-        }],
-        orderNotes: req.body.orderNotes || '', // Optional order notes from user
-        deliveryTimeRange: deliveryTimeRange, // Store the delivery time range here
-      },
-    ],
-    { session },
-  );
+  ], { session });
 
   // 14. Restore the inventory
   for (const item of cart.items) {
@@ -353,9 +300,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
   // Send the response with the new order details
   res.status(201).json({
     status: 'success',
-    order: populatedOrder,
-    deliveryTimeRange: deliveryTimeRange,
-    clientSecret: paymentIntent?.client_secret, // Include client secret for Stripe
+    order: populatedOrder
   });
 });
 
@@ -392,7 +337,7 @@ const getAdditionalCharges = catchAsync(async (req, res, next) => {
         $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
       },
     },
-  });
+  }).session(session);
 
   console.log(nearestFulfillmentCenter);
 
@@ -609,9 +554,9 @@ const reorder = setTransaction(async (req, res, next, session) => {
         deliveryFee: deliveryFee,
         trackingNumber: req.body.trackingNumber || '',
         status: req.body.paymentMethod === 'credit_card' ? 'awaiting_payment' : 'pending',
-        statusHistory: [{ 
-          status: req.body.paymentMethod === 'credit_card' ? 'awaiting_payment' : 'pending', 
-          changedAt: new Date() 
+        statusHistory: [{
+          status: req.body.paymentMethod === 'credit_card' ? 'awaiting_payment' : 'pending',
+          changedAt: new Date()
         }],
         orderNotes: req.body.orderNotes || previousOrder.orderNotes || '',
         deliveryTimeRange: deliveryTimeRange,
@@ -1020,8 +965,8 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
 
 // Add a new function to handle payment confirmation
 const confirmOrderPayment = catchAsync(async (req, res, next) => {
-  const { orderId, paymentIntentId } = req.body;
-
+  const { orderId } = req.params;
+  
   const order = await Order.findById(orderId);
   if (!order) {
     return next(new AppError('Order not found', 404));
@@ -1032,12 +977,16 @@ const confirmOrderPayment = catchAsync(async (req, res, next) => {
   }
 
   try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    // Verify the payment intent status directly from Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(order.paymentIntentId);
     
     if (paymentIntent.status === 'succeeded') {
       order.paymentStatus = 'paid';
       order.status = 'pending';
-      order.statusHistory.push({ status: 'pending', changedAt: new Date() });
+      order.statusHistory.push({ 
+        status: 'pending', 
+        changedAt: new Date() 
+      });
       await order.save();
 
       res.status(200).json({
@@ -1046,10 +995,61 @@ const confirmOrderPayment = catchAsync(async (req, res, next) => {
         order,
       });
     } else {
-      return next(new AppError('Payment not successful', 400));
+      return next(new AppError(`Payment not successful. Status: ${paymentIntent.status}`, 400));
     }
   } catch (error) {
     return next(new AppError('Error confirming payment: ' + error.message, 400));
+  }
+});
+
+// Add new function to initiate payment
+const initiatePayment = catchAsync(async (req, res, next) => {
+  const { orderId } = req.params;
+
+  // Find the order
+  const order = await Order.findById(orderId);
+  if (!order) {
+    return next(new AppError('Order not found', 404));
+  }
+
+  // Verify order belongs to user
+  if (order.user.toString() !== req.user._id.toString()) {
+    return next(new AppError('Not authorized to access this order', 403));
+  }
+
+  // Check if payment is already processed
+  if (order.paymentStatus === 'paid') {
+    return next(new AppError('Order is already paid', 400));
+  }
+
+  try {
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(order.totalPrice * 100),
+      currency: 'usd',
+      metadata: {
+        orderId: order._id.toString(),
+        orderNumber: order.orderNumber
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    // Update order with payment intent ID
+    order.paymentIntentId = paymentIntent.id;
+    await order.save();
+
+    // Return the payment details
+    res.status(200).json({
+      status: 'success',
+      paymentIntent: {
+        clientSecret: paymentIntent.client_secret,
+        publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
+      }
+    });
+  } catch (error) {
+    return next(new AppError('Error creating payment: ' + error.message, 400));
   }
 });
 
@@ -1064,4 +1064,5 @@ module.exports = {
   reorder,
   getAdditionalCharges,
   confirmOrderPayment,
+  initiatePayment,
 };

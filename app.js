@@ -12,6 +12,7 @@ const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
 // const userRouter = require("./routes/userRoutes");
 const router = require('./routes/router');
+const webhookRouter = require('./routes/webhookRouter');
 
 const app = express();
 
@@ -36,12 +37,16 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Body parser, reading data from body into req.body
-app.use(
-  express.json({
-    limit: '10kb',
-  }),
+// Webhook route should be before the body parser
+// This ensures that the webhook receives the raw body for signature verification
+app.post(
+  '/webhook/stripe',
+  express.raw({ type: 'application/json' }),
+  webhookRouter
 );
+
+// Regular body parser for other routes
+app.use(express.json());
 
 // Data sanitization against NoSql query injection
 app.use(mongoSanitize());

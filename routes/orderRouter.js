@@ -29,10 +29,11 @@ router
   .get(orderController.getOrder)
   .patch(orderController.updateOrderStatus);
 
-router.post(
-  '/confirm-payment',
-  authController.protect,
-  orderController.confirmOrderPayment
-);
+// Initiate payment
+router.route('/:orderId/initiate-payment')
+  .post(
+    authController.protect,
+    orderController.initiatePayment
+  );
 
 module.exports = router;
