@@ -2,7 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/orderModel');
 const catchAsync = require('../utils/catchAsync');
 const User = require('../models/userModel');
-const sendNotification = require('../utils/sendNotification');
+const { sendNotification } = require('../notifications');
 
 const webhookHandler = catchAsync(async (req, res) => {
     const sig = req.headers['stripe-signature'];
