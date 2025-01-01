@@ -32,9 +32,9 @@ const stripeWebhookHandler = async (req, res) => {
 
                 // Update order status
                 order.paymentStatus = 'paid';
-                order.status = 'confirmed';
+                order.status = 'pending';
                 order.statusHistory.push({
-                    status: 'confirmed',
+                    status: 'pending',
                     changedAt: new Date()
                 });
                 await order.save();
