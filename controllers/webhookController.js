@@ -29,9 +29,9 @@ const webhookHandler = catchAsync(async (req, res) => {
 
             if (order) {
                 order.paymentStatus = 'paid';
-                order.status = 'pending';
+                order.status = 'confirmed';
                 order.statusHistory.push({
-                    status: 'pending',
+                    status: 'confirmed',
                     changedAt: new Date()
                 });
                 await order.save();
