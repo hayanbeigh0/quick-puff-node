@@ -272,9 +272,9 @@ const createOrder = setTransaction(async (req, res, next, session) => {
       serviceFee: serviceFee,
       deliveryFee: deliveryFee,
       status: 'awaiting-payment',
-      statusHistory: [{ 
-        status: 'awaiting-payment', 
-        changedAt: new Date() 
+      statusHistory: [{
+        status: 'awaiting-payment',
+        changedAt: new Date()
       }],
       deliveryTimeRange: deliveryTimeRange,
     }
@@ -642,6 +642,7 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
     {
       $match: {
         user: userId,
+        status: { $ne: 'failed' }, // Exclude failed orders
         createdAt: { $gte: startDate, $lt: endDate }, // Match orders on the specific date
       },
     },
@@ -966,7 +967,7 @@ const updateOrderStatus = catchAsync(async (req, res, next) => {
 // Add a new function to handle payment confirmation
 const confirmOrderPayment = catchAsync(async (req, res, next) => {
   const { orderId } = req.params;
-  
+
   const order = await Order.findById(orderId);
   if (!order) {
     return next(new AppError('Order not found', 404));
@@ -979,13 +980,13 @@ const confirmOrderPayment = catchAsync(async (req, res, next) => {
   try {
     // Verify the payment intent status directly from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(order.paymentIntentId);
-    
+
     if (paymentIntent.status === 'succeeded') {
       order.paymentStatus = 'paid';
       order.status = 'pending';
-      order.statusHistory.push({ 
-        status: 'pending', 
-        changedAt: new Date() 
+      order.statusHistory.push({
+        status: 'pending',
+        changedAt: new Date()
       });
       await order.save();
 
