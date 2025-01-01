@@ -1006,6 +1006,72 @@ const initiatePayment = catchAsync(async (req, res, next) => {
   }
 });
 
+// Add this new function to orderController.js
+const cancelOrderByPaymentIntent = catchAsync(async (req, res, next) => {
+  const { paymentIntentId } = req.params;
+
+  // Find order by payment intent ID
+  const order = await Order.findOne({ paymentIntentId });
+
+  if (!order) {
+    return next(new AppError('No order found with that payment intent ID', 404));
+  }
+
+  // Verify that the order belongs to the requesting user
+  if (order.user.toString() !== req.user._id.toString()) {
+    return next(new AppError('You are not authorized to cancel this order', 403));
+  }
+
+  // Check if order is in a cancellable state
+  if (['delivered', 'cancelled', 'failed'].includes(order.status)) {
+    return next(new AppError(`Order cannot be cancelled because it is ${order.status}`, 400));
+  }
+
+  try {
+    // Cancel the payment intent in Stripe
+    await stripe.paymentIntents.cancel(paymentIntentId);
+
+    // Update order status
+    order.status = 'cancelled';
+    order.paymentStatus = 'cancelled';
+    order.statusHistory.push({
+      status: 'cancelled',
+      changedAt: new Date()
+    });
+
+    // Restore cart items
+    const cart = await Cart.create({
+      user: order.user,
+      items: order.items.map(item => ({
+        product: item.product,
+        quantity: item.quantity
+      }))
+    });
+
+    // Save the cart (total price will be calculated by pre-save middleware)
+    await cart.save();
+
+    // Restore product inventory
+    for (const item of order.items) {
+      await Product.findByIdAndUpdate(
+        item.product,
+        { $inc: { stock: item.quantity } }
+      );
+    }
+
+    // Save the order
+    await order.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Order cancelled successfully',
+      order
+    });
+  } catch (error) {
+    return next(new AppError(`Error cancelling order: ${error.message}`, 400));
+  }
+});
+
 module.exports = {
   createOrder,
   cancelOrder,
@@ -1018,4 +1084,5 @@ module.exports = {
   getAdditionalCharges,
   confirmOrderPayment,
   initiatePayment,
+  cancelOrderByPaymentIntent
 };

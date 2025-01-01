@@ -36,4 +36,11 @@ router.route('/:orderId/initiate-payment')
     orderController.initiatePayment
   );
 
+// Add this new route
+router.post(
+  '/cancel-payment/:paymentIntentId',
+  authController.protect,
+  orderController.cancelOrderByPaymentIntent
+);
+
 module.exports = router;
