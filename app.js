@@ -37,14 +37,6 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Webhook route should be before the body parser
-// This ensures that the webhook receives the raw body for signature verification
-app.post(
-  '/webhook/stripe',
-  express.raw({ type: 'application/json' }),
-  webhookRouter
-);
-
 // Regular body parser for other routes
 app.use(express.json());
 

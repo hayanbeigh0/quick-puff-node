@@ -17,6 +17,7 @@ const adminRouter = require('./adminRouter');
 const advertisementRouter = require('./advertisementRouter');
 const fulfillmentCenterRouter = require('./fulfillmentCenterRouter');
 const feedbackRouter = require('./feedbackRouter');
+const webhookRouter = require('./webhookRouter');
 
 const router = express.Router();
 
@@ -37,4 +38,9 @@ router.use('/admin', adminRouter);
 router.use('/advertisement', advertisementRouter);
 router.use('/fulfillmentCenter', fulfillmentCenterRouter);
 router.use('/feedback', feedbackRouter);
+router.use(
+    '/webhook',
+    express.raw({ type: 'application/json' }),
+    webhookRouter
+);
 module.exports = router;
