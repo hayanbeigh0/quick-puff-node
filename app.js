@@ -37,8 +37,12 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Regular body parser for other routes
+// Important: Place webhook route BEFORE any body parsers
+app.use('/webhook', webhookRouter);
+
+// Regular middleware for other routes
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Data sanitization against NoSql query injection
 app.use(mongoSanitize());
