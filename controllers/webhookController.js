@@ -2,6 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/orderModel');
 const User = require('../models/userModel');
 const Cart = require('../models/cartModel');
+const Product = require('../models/productModel');
 const { sendNotification } = require('../notifications');
 
 const stripeWebhookHandler = async (req, res) => {
