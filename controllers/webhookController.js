@@ -116,6 +116,64 @@ const stripeWebhookHandler = async (req, res) => {
                 break;
             }
 
+            case 'payment_intent.canceled': {
+                const paymentIntent = event.data.object;
+                const order = await Order.findOne({ paymentIntentId: paymentIntent.id });
+
+                if (!order) {
+                    console.log(`No order found for canceled payment intent: ${paymentIntent.id}`);
+                    return res.json({ received: true });
+                }
+
+                // Update order status
+                order.paymentStatus = 'cancelled';
+                order.status = 'cancelled';
+                order.statusHistory.push({
+                    status: 'cancelled',
+                    changedAt: new Date()
+                });
+                await order.save();
+
+                // Restore cart items and inventory just like with failed payments
+                try {
+                    const cart = await Cart.create({
+                        user: order.user,
+                        items: order.items.map(item => ({
+                            product: item.product,
+                            quantity: item.quantity
+                        }))
+                    });
+
+                    await cart.calculateTotalPrice();
+                    await cart.save();
+
+                    // Restore product inventory
+                    for (const item of order.items) {
+                        await Product.findByIdAndUpdate(
+                            item.product,
+                            { $inc: { stock: item.quantity } }
+                        );
+                    }
+                } catch (error) {
+                    console.error('Error restoring cart:', error);
+                }
+
+                // Notify user about cancelled payment
+                const user = await User.findById(order.user);
+                if (user?.deviceTokens?.length > 0) {
+                    try {
+                        await sendNotification(
+                            user.deviceTokens,
+                            'Payment Cancelled',
+                            `Your payment for order ${order.orderNumber} was cancelled. Your cart has been restored.`
+                        );
+                    } catch (notificationError) {
+                        console.error('Notification error:', notificationError);
+                    }
+                }
+                break;
+            }
+
             default:
                 console.log(`Unhandled event type: ${event.type}`);
         }
