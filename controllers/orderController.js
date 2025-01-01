@@ -482,10 +482,10 @@ const reorder = setTransaction(async (req, res, next, session) => {
       ));
     }
 
-    const discountAmount = promo.discountType === 'percentage' 
-      ? (productTotalPrice * promo.discountValue) / 100 
+    const discountAmount = promo.discountType === 'percentage'
+      ? (productTotalPrice * promo.discountValue) / 100
       : promo.discountValue;
-    
+
     totalPrice -= discountAmount;
   }
 
