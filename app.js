@@ -37,11 +37,14 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Important: Place webhook route BEFORE any body parsers
-app.use('/webhook', express.raw({ type: 'application/json' }), webhookRouter,);
+// Important: Place this BEFORE any other middleware that might process the body
+app.use('/webhook/stripe', 
+  express.raw({ type: 'application/json' }), // This ensures the body remains raw for webhooks
+  webhookRouter
+);
 
 // Regular middleware for other routes
-app.use(express.json());
+app.use(express.json()); // This should come AFTER the webhook route
 app.use(express.urlencoded({ extended: true }));
 
 // Data sanitization against NoSql query injection
