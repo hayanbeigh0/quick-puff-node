@@ -38,7 +38,7 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Important: Place webhook route BEFORE any body parsers
-app.use('/webhook', webhookRouter);
+app.use('/webhook', express.raw({ type: 'application/json' }), webhookRouter,);
 
 // Regular middleware for other routes
 app.use(express.json());
