@@ -54,9 +54,9 @@ const webhookHandler = catchAsync(async (req, res) => {
 
             if (failedOrder) {
                 failedOrder.paymentStatus = 'failed';
-                failedOrder.status = 'payment_failed';
+                failedOrder.status = 'failed';
                 failedOrder.statusHistory.push({
-                    status: 'payment_failed',
+                    status: 'failed',
                     changedAt: new Date()
                 });
                 await failedOrder.save();
