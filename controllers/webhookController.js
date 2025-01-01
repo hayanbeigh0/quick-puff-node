@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Order = require('../models/orderModel');
 const User = require('../models/userModel');
+const Cart = require('../models/cartModel');
 const { sendNotification } = require('../notifications');
 
 const stripeWebhookHandler = async (req, res) => {
@@ -30,7 +31,7 @@ const stripeWebhookHandler = async (req, res) => {
                     return res.json({ received: true });
                 }
 
-                // Update order status
+                // Just update payment status - cart is already cleared
                 order.paymentStatus = 'paid';
                 order.status = 'pending';
                 order.statusHistory.push({
@@ -73,6 +74,30 @@ const stripeWebhookHandler = async (req, res) => {
                 });
                 await order.save();
 
+                // Restore cart items with populated product details for price calculation
+                try {
+                    const cart = await Cart.create({
+                        user: order.user,
+                        items: order.items.map(item => ({
+                            product: item.product,
+                            quantity: item.quantity
+                        }))
+                    });
+
+                    // The pre-save middleware will automatically calculate the total price
+                    await cart.save();
+
+                    // Restore product inventory
+                    for (const item of order.items) {
+                        await Product.findByIdAndUpdate(
+                            item.product,
+                            { $inc: { stock: item.quantity } }
+                        );
+                    }
+                } catch (error) {
+                    console.error('Error restoring cart:', error);
+                }
+
                 // Notify user about failed payment
                 const user = await User.findById(order.user);
                 if (user?.deviceTokens?.length > 0) {
@@ -80,7 +105,7 @@ const stripeWebhookHandler = async (req, res) => {
                         await sendNotification(
                             user.deviceTokens,
                             'Payment Failed',
-                            `Your payment for order ${order.orderNumber} was unsuccessful. Please try again.`
+                            `Your payment for order ${order.orderNumber} was unsuccessful. Your cart has been restored.`
                         );
                     } catch (notificationError) {
                         console.error('Notification error:', notificationError);
