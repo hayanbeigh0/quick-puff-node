@@ -985,7 +985,8 @@ const initiatePayment = catchAsync(async (req, res, next) => {
         orderId: order._id.toString(),
         orderNumber: order.orderNumber
       },
-      payment_method_types: ['card'], // Only allow card payments
+      payment_method_types: ['card'],
+      automatic_payment_methods: { enabled: false } // Explicitly disable automatic payment methods
     });
 
     // Update order with payment intent ID
