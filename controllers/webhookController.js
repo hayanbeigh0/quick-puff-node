@@ -86,6 +86,7 @@ const stripeWebhookHandler = async (req, res) => {
                     });
 
                     // The pre-save middleware will automatically calculate the total price
+                    await cart.calculateTotalPrice();
                     await cart.save();
 
                     // Restore product inventory
