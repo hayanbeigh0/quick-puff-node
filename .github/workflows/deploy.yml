@@ -28,7 +28,6 @@ jobs:
             cd /home/quickpuff795/quick-puff-node
 
             # Run deployment commands
-            git checkout main
             git pull origin main
             npm install
 
