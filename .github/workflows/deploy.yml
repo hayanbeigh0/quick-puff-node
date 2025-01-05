@@ -28,7 +28,8 @@ jobs:
             cd /home/quickpuff795/quick-puff-node
 
             # Run deployment commands
-            git pull origin main
+            git checkout development
+            git pull origin development
             npm install
 
             # Start the app with a specific name (pm2 will handle it correctly now)
