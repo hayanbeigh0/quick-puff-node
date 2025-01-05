@@ -1,4 +1,5 @@
 const BrandCategory = require('../models/brandCategoryModel');
+const APIFeatures = require('../utils/apiFeatures');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const factory = require('./handlerFactory');
@@ -21,7 +22,45 @@ const createBrandCategory = catchAsync(async (req, res, next) => {
   });
 });
 
-const getBrandCategories = factory.getAll(BrandCategory);
+const getBrandCategories = catchAsync(async (req, res, next) => {
+  let filter = {};
+  if (req.params.brandCategoryId) filter = { brandCategory: req.params.brandCategoryId };
+
+  // Build the query
+  let query = BrandCategory.find(filter);
+
+  // Apply API Features like filtering, sorting, limiting fields, and pagination
+  const features = new APIFeatures(query, req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+
+  let data = await features.query;
+
+  // Populate product categories
+  data = await BrandCategory.populate(data, {
+    path: 'productCategories',
+    select: 'name _id'
+  });
+
+  const totalItems = await BrandCategory.countDocuments(filter);
+  const limit = features.queryString.limit * 1 || 100;
+  const page = features.queryString.page * 1 || 1;
+  const totalPages = Math.ceil(totalItems / limit);
+
+  res.status(200).json({
+    status: 'success',
+    results: data.length,
+    brandCategories: data,
+    pageInfo: {
+      page,
+      limit,
+      totalPages,
+      totalItems
+    },
+  });
+});
 
 // Controller function to handle brand category update
 const updateBrandCategory = catchAsync(async (req, res, next) => {

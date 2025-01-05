@@ -38,9 +38,52 @@ const sendEmailVerificationCode = async ({ email, verificationCode }) => {
 // import Mailgen from "mailgen";
 // import nodemailer from "nodemailer";
 
+// const sendEmail = async (options) => {
+//   // Set the SendGrid API key from environment variables
+//   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+//   // Initialize Mailgen with theme and brand configuration
+//   const mailGenerator = new Mailgen({
+//     theme: 'default',
+//     product: {
+//       name: 'Quick Puff',
+//       link: 'https://deliveryapptest.com',
+//     },
+//   });
+
+//   // Generate the plaintext and HTML versions of the email
+//   const emailText = mailGenerator.generatePlaintext(options.mailgenContent);
+//   const emailHtml = mailGenerator.generate(options.mailgenContent);
+
+//   // Email details
+//   const mailOptions = {
+//     to: options.email, // Recipient email
+//     from: 'quickpuff048@gmail.com', // Sender email address
+//     subject: options.subject, // Email subject
+//     text: emailText, // Plaintext version
+//     html: emailHtml, // HTML version
+//   };
+
+//   try {
+//     // Send the email using SendGrid
+//     await sgMail.send(mailOptions);
+//   } catch (error) {
+//     console.error('Failed to send email:', error.response?.body || error);
+//   }
+// };
+
+// Load SMTP credentials from environment variables
 const sendEmail = async (options) => {
-  // Set the SendGrid API key from environment variables
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  // Configure nodemailer with AWS SES SMTP credentials
+  const transporter = nodemailer.createTransport({
+    host: 'email-smtp.ap-south-1.amazonaws.com', // SES SMTP endpoint (from your config)
+    port: 587, // Use port 587 for STARTTLS
+    secure: false, // Use false for STARTTLS
+    auth: {
+      user: process.env.AWS_SMTP_USER_NAME, // AWS SMTP username
+      pass: process.env.AWS_SMTP_PASSWORD, // AWS SMTP password
+    },
+  });
 
   // Initialize Mailgen with theme and brand configuration
   const mailGenerator = new Mailgen({
@@ -51,24 +94,26 @@ const sendEmail = async (options) => {
     },
   });
 
-  // Generate the plaintext and HTML versions of the email
+  // Generate plaintext and HTML email content
   const emailText = mailGenerator.generatePlaintext(options.mailgenContent);
   const emailHtml = mailGenerator.generate(options.mailgenContent);
 
-  // Email details
+  // Configure the email details
   const mailOptions = {
     to: options.email, // Recipient email
-    from: 'quickpuff048@gmail.com', // Sender email address
+    from: '"Quick Puff quickpuff795@gmail.com', // Sender email
     subject: options.subject, // Email subject
-    text: emailText, // Plaintext version
-    html: emailHtml, // HTML version
+    text: emailText, // Plaintext version of email
+    html: emailHtml, // HTML version of email
   };
 
   try {
-    // Send the email using SendGrid
-    await sgMail.send(mailOptions);
+    // Send the email using nodemailer with AWS SES
+    const info = await transporter.sendMail(mailOptions);
+    console.log(info);
+    console.log('Email sent successfully:', info.messageId);
   } catch (error) {
-    console.error('Failed to send email:', error.response?.body || error);
+    console.error('Failed to send email:', error.message);
   }
 };
 

@@ -16,7 +16,7 @@ router
   .patch(authController.protect, advertisementController.updateAdvertisement)
   .delete(authController.protect, advertisementController.deleteAdvertisement);
 router
-  .route('/category/:id')
-  .get(advertisementController.getAdvertisementBasedOnCategory);
+  .route('/category/:categoryId')
+  .get(advertisementController.getAdvertisementBasedOnProductCategory);
 
 module.exports = router;

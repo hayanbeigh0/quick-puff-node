@@ -15,7 +15,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
     const { productCategoryId } = req.params;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 8;
-    const productsLimit = parseInt(req.query.productsLimit, 10) || 8;
+    const productsLimit = parseInt(req.query.productsLimit, 10) || 20;
 
     const cacheKey = `brands-${productCategoryId}-page-${page}-limit-${limit}`;
 
@@ -141,8 +141,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             name: '$productsForBrand.name',
             image: '$productsForBrand.image',
             price: '$productsForBrand.price',
-            puff: '$productsForBrand.puff',
-            volume: '$productsForBrand.volume',
+            quantity: '$productsForBrand.quantity',
             stock: '$productsForBrand.stock',
           },
         },
@@ -214,8 +213,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(
             name: product.name,
             image: product.image,
             price: product.price,
-            puff: product.puff,
-            volume: product.volume,
+            quantity: product.quantity,
             stock: product.stock,
           })),
           remainingItems, // Remaining products count
@@ -269,7 +267,8 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
     deals,
     available,
     flavor,
-    maxPuff,
+    maxQuantityValue,
+    maxQuantityUnit,
     nicotineStrength,
     minPrice,
     maxPrice,
@@ -294,8 +293,9 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
     matchFilters.flavor = mongoose.Types.ObjectId(flavor);
   }
 
-  if (maxPuff) {
-    matchFilters.puff = { $lte: parseInt(maxPuff, 10) };
+  if (maxQuantityValue && maxQuantityUnit) {
+    matchFilters['quantity.value'] = { $lte: parseInt(maxQuantityValue, 10) };
+    matchFilters['quantity.unit'] = maxQuantityUnit.trim();
   }
 
   if (nicotineStrength) {
@@ -376,8 +376,7 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
               name: 1,
               image: 1,
               price: 1,
-              puff: 1,
-              volume: 1,
+              quantity: 1, // Include quantity object with value and unit
               stock: 1,
               nicotineStrength: 1,
               flavor: {
@@ -421,7 +420,8 @@ const getTotalProductsCountByBrandAndCategory = catchAsync(
       deals, // Boolean for deals
       available, // Boolean for availability
       flavor, // Flavor ObjectId
-      maxPuff, // Maximum puff count
+      maxQuantityValue, // Maximum quantity value
+      maxQuantityUnit, // Maximum quantity unit
       nicotineStrength, // Nicotine Strength
       minPrice, // Minimum Price
       maxPrice, // Maximum Price
@@ -446,8 +446,9 @@ const getTotalProductsCountByBrandAndCategory = catchAsync(
       matchFilters.flavor = mongoose.Types.ObjectId(flavor);
     }
 
-    if (maxPuff) {
-      matchFilters.puff = { $lte: parseInt(maxPuff, 10) }; // Puff count should be less than or equal to maxPuff
+    if (maxQuantityValue && maxQuantityUnit) {
+      matchFilters['quantity.value'] = { $lte: parseInt(maxQuantityValue, 10) };
+      matchFilters['quantity.unit'] = maxQuantityUnit.trim();
     }
 
     if (nicotineStrength) {

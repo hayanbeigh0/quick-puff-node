@@ -1,6 +1,21 @@
 const mongoose = require('mongoose');
 const AppError = require('../utils/appError');
 
+// Sub-schema for quantity options
+const quantityOptionSchema = new mongoose.Schema(
+  {
+    value: {
+      type: Number,
+      min: 0,
+    },
+    unit: {
+      type: String,
+      enum: ['puffs', 'ml', 'oz', 'in', 'ct'], // Add other units as needed
+    },
+  },
+  { _id: false } // Prevent auto-generated _id for subdocuments
+);
+
 const productSchema = new mongoose.Schema(
   {
     name: {
@@ -32,58 +47,19 @@ const productSchema = new mongoose.Schema(
       default: Infinity,
       required: true,
     },
-    puff: {
-      type: Number,
-      min: 0,
-      max: Infinity,
-      default: null,
-      validate: {
-        validator: function (v) {
-          // Check if either puff or volume is set, but not both
-          return this.volume == null || v == null;
-        },
-        message: 'Either puff or volume should be set, not both.',
+    quantity: {
+      value: {
+        type: Number,
+        min: 0,
+        default: null,
+      },
+      unit: {
+        type: String,
+        enum: ['puffs', 'ml', 'oz', 'in', 'ct'], // Add other units as needed
+        default: null,
       },
     },
-    puffOptions: {
-      type: [Number],
-      min: 0,
-      max: Infinity,
-      default: null,
-      validate: {
-        validator: function (v) {
-          // Check if either puff or volume is set, but not both
-          return this.volume == null || v == null;
-        },
-        message: 'Either puff or volume should be set, not both.',
-      },
-    },
-    volume: {
-      type: Number,
-      min: 0,
-      max: Infinity,
-      default: null,
-      validate: {
-        validator: function (v) {
-          // Check if either volume or puff is set, but not both
-          return this.puff == null || v == null;
-        },
-        message: 'Either puff or volume should be set, not both.',
-      },
-    },
-    volumeOptions: {
-      type: [Number],
-      min: 0,
-      max: Infinity,
-      default: null,
-      validate: {
-        validator: function (v) {
-          // Check if either puff or volume is set, but not both
-          return this.puff == null || v == null;
-        },
-        message: 'Either puff or volume should be set, not both.',
-      },
-    },
+    quantityOptions: [quantityOptionSchema], // Use the sub-schema
     nicotineStrength: {
       type: Number,
       min: 0,
@@ -148,7 +124,7 @@ const productSchema = new mongoose.Schema(
         delete ret._id;
       },
     },
-  },
+  }
 );
 
 // Virtual field for 'available'
@@ -175,6 +151,7 @@ productSchema.methods.reduceStock = async function (quantity) {
 productSchema.index({ productCategory: 1 });
 productSchema.index({ brand: 1 });
 productSchema.index({ name: 1 });
+productSchema.index({ productCategory: 1, brand: 1 }); // Compound index
 
 const Product = mongoose.model('Product', productSchema);
 

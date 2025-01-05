@@ -1,3 +1,4 @@
+const ErrorLog = require('../models/errorLogModel');
 const AppError = require('../utils/appError');
 
 const handleCastErrorDB = (err) => {
@@ -31,7 +32,7 @@ const sendErrorDev = (err, res) => {
     code: err.errorCode,
   });
 };
-const sendErrorProd = (err, res) => {
+const sendErrorProd = async (err, res) => {
   // Operational, trusted error: send message to client
   if (err.isOperational) {
     res.status(err.statusCode).json({
@@ -43,6 +44,23 @@ const sendErrorProd = (err, res) => {
   } else {
     // 1.) Log error
     console.error('ERROR:❗️', err);
+
+    try {
+      // Save error to the database
+      const errorLog = new ErrorLog({
+        message: err.message,
+        stack_trace: err.stack, // Stack trace of the error
+        request_url: res.req.originalUrl, // URL where the error occurred
+        request_method: res.req.method, // HTTP method (GET, POST, etc.)
+        user_id: res.user ? res.user._id : null, // Optional: Log the user if applicable
+        ip_address: res.req.ip, // IP address of the client
+      });
+
+      // Save the log asynchronously (you can add `await` if you're using `async`/`await`)
+      await errorLog.save();
+    } catch (dbError) {
+      console.error('Error logging to the database:', dbError);
+    }
     // 2) Send generic message
     res.status(500).json({
       status: 'error',

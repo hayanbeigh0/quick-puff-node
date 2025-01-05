@@ -22,12 +22,14 @@ router
   .post(
     authController.protect,
     fileUploadController.handleFileUpload,
+    productController.validateProductData,
     productController.createProduct,
   )
   .get(productController.getProducts)
   .patch(
     authController.protect,
     fileUploadController.handleFileUpload,
+    productController.validateProductData,
     productController.updateProduct,
   );
 

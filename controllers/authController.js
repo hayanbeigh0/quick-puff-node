@@ -8,9 +8,20 @@ const { sendEmail, loginCodeMailgenContent } = require('../utils/email');
 const crypto = require('crypto');
 const appleSigninAuth = require('apple-signin-auth');
 const ErrorCodes = require('../utils/appErrorCodes');
+const { updateDeviceToken } = require('./userController');
 
-const createAndSendToken = (user, statusCode, res) => {
+const createAndSendToken = async (user, statusCode, res, deviceToken) => {
   const token = signToken(user._id);
+
+  // Update the device token if provided
+  // if (deviceToken) {
+  //   console.log(deviceToken);
+  //   if (!user.deviceTokens.includes(deviceToken)) {
+  //     user.deviceTokens.push(deviceToken);
+  //     await user.save({ validateBeforeSave: false });
+  //   }
+  // }
+
   const cookieOptions = {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000,
@@ -21,7 +32,6 @@ const createAndSendToken = (user, statusCode, res) => {
     cookieOptions.secure = true;
   }
   res.cookie('jwt', token, cookieOptions);
-
   res.status(statusCode).json({
     status: 'success',
     token,
@@ -41,7 +51,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Google Sign-In
 exports.googleSignIn = catchAsync(async (req, res, next) => {
-  const { idToken } = req.body;
+  const { idToken, deviceToken } = req.body;
 
   if (!idToken) {
     return next(
@@ -53,7 +63,7 @@ exports.googleSignIn = catchAsync(async (req, res, next) => {
     );
   }
 
-  // 1) Verify the ID token
+  // Verify Google ID token
   let payload;
   try {
     const ticket = await client.verifyIdToken({
@@ -70,33 +80,32 @@ exports.googleSignIn = catchAsync(async (req, res, next) => {
       ),
     );
   }
-  console.log(payload);
 
   const { email, name, sub: googleId } = payload;
 
-  // 2) Check if the user already exists
+  // Check if the user already exists
   let user = await User.findOne({ email });
 
   if (!user) {
-    // 3) If user does not exist, create a new user
+    // Create new user
     user = await User.create({
       name,
       email,
       googleId,
     });
   } else if (!user.googleId) {
-    // If the user exists but doesn't have a Google ID, attach it
+    // Attach Google ID if missing
     user.googleId = googleId;
     await user.save({ validateBeforeSave: false });
   }
 
-  // 4) Create and send token
-  createAndSendToken(user, 200, res);
+  // Create and send token, include device token
+  await createAndSendToken(user, 200, res, deviceToken);
 });
 
 // Apple Sign-In
 exports.appleSignIn = catchAsync(async (req, res, next) => {
-  const { idToken, email: reqEmail, fullName } = req.body;
+  const { idToken, email: reqEmail, fullName, deviceToken } = req.body;
 
   if (!idToken) {
     return next(
@@ -110,7 +119,7 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
 
   let appleUser;
   try {
-    // Verify the Apple ID token
+    // Verify Apple ID token
     appleUser = await appleSigninAuth.verifyIdToken(idToken, {
       audience: process.env.APPLE_CLIENT_ID,
       ignoreExpiration: false,
@@ -125,26 +134,20 @@ exports.appleSignIn = catchAsync(async (req, res, next) => {
     );
   }
 
-  // Extract the fields you need from the verified token
   const { sub: appleId, email: appleEmail } = appleUser;
-
-  // If Apple doesn't provide the email in the token, fall back to the email from the request body
   const email = appleEmail || reqEmail;
 
-  // Check if the user already exists in your database
   let user = await User.findOne({ email });
 
   if (!user) {
-    // If the user does not exist, create a new user
     user = await User.create({
       name: fullName,
-      email, // Store the email as a string, not an object
-      appleId, // Apple-specific user identifier
+      email,
+      appleId,
     });
   }
 
-  // Create and send token for the authenticated user
-  createAndSendToken(user, 200, res);
+  await createAndSendToken(user, 200, res, deviceToken);
 });
 
 exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
@@ -210,24 +213,30 @@ exports.signupOrSigninWithEmail = catchAsync(async (req, res, next) => {
 });
 
 exports.verifyAuthCode = catchAsync(async (req, res, next) => {
-  const { verificationCode, email } = req.body;
+  const { verificationCode, email, deviceToken } = req.body;
 
   const queryOptions = {
     email,
   };
-  
+
   if (email !== 'test@example.com') {
     queryOptions.verificationCodeExpires = { $gt: Date.now() };
   }
-  
+
   // Find the user with the given verification code
   const user = await User.findOne(queryOptions);
 
+  // Special case for test accounts
   if (user && user.email === 'test@example.com' && verificationCode === 8888) {
+    if (deviceToken && !user.deviceTokens.includes(deviceToken)) {
+      user.deviceTokens.push(deviceToken);
+      await user.save();
+    }
     createAndSendToken(user, 200, res);
     return;
   }
 
+  // If no user is found or code is invalid
   if (!user) {
     return next(
       new AppError(
@@ -238,13 +247,13 @@ exports.verifyAuthCode = catchAsync(async (req, res, next) => {
     );
   }
 
+  // Verify the provided code
   const candidateHashCode = crypto
     .createHash('sha256')
     .update(`${verificationCode}`)
     .digest('hex');
 
-  // Compare candidate hash code with hash store in db
-  if (candidateHashCode !== user.verificationCode)
+  if (candidateHashCode !== user.verificationCode) {
     return next(
       new AppError(
         'Invalid verification code',
@@ -252,19 +261,95 @@ exports.verifyAuthCode = catchAsync(async (req, res, next) => {
         ErrorCodes.INVALID_VERIFICATION_CODE.code,
       ),
     );
+  }
 
   // Clear the verification code and expiration
   user.verificationCode = undefined;
   user.verificationCodeExpires = undefined;
+
+  // Add the device token if it is provided and not already in the user's record
+  if (deviceToken && !user.deviceTokens.includes(deviceToken)) {
+    user.deviceTokens.push(deviceToken);
+  }
+
   await user.save();
 
   // Create and send token
-  createAndSendToken(user, 200, res);
+  createAndSendToken(user, 200, res, deviceToken);
+});
+
+exports.logout = catchAsync(async (req, res, next) => {
+  const { deviceToken } = req.body;
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Remove device token
+  user.deviceTokens = user.deviceTokens.filter(
+    (token) => token !== deviceToken,
+  );
+  await user.save();
+
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+  });
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Logged out successfully!',
+  });
 });
 
 exports.protect = catchAsync(async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+  if (!token) {
+    return next(
+      new AppError(
+        'You are not logged in! Please login to get access.',
+        401,
+        ErrorCodes.NOT_LOGGED_IN.code,
+      ),
+    );
+  }
+
+  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  const currentUser = await User.findById(decoded.id);
+  if (!currentUser) {
+    return next(
+      new AppError(
+        'The user belonging to the token does not exist!',
+        401,
+        ErrorCodes.NO_USER_BELONGING_TO_TOKEN.code,
+      ),
+    );
+  }
+
+  req.user = currentUser;
+
+  // Update device token
+  // if (req.body.deviceToken) {
+  //   updateDeviceToken(req, res);
+  // }
+
+  next();
+});
+
+exports.getUser = catchAsync(async (req, res, next) => {
   // 1) Getting the token and check if it exists.
   let token;
+  if (!req.headers.authorization) {
+    return next();
+  }
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
@@ -305,7 +390,7 @@ exports.protect = catchAsync(async (req, res, next) => {
   next();
 });
 
-exports.getUser = catchAsync(async (req, res, next) => {
+exports.deviceToken = catchAsync(async (req, res, next) => {
   // 1) Getting the token and check if it exists.
   let token;
   if (!req.headers.authorization) {

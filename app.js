@@ -12,6 +12,7 @@ const AppError = require('./utils/appError');
 const globalErrorHandler = require('./controllers/errorController');
 // const userRouter = require("./routes/userRoutes");
 const router = require('./routes/router');
+const webhookRouter = require('./routes/webhookRouter');
 
 const app = express();
 
@@ -36,12 +37,15 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Body parser, reading data from body into req.body
-app.use(
-  express.json({
-    limit: '10kb',
-  }),
+// Important: Place this BEFORE any other middleware that might process the body
+app.use('/api/v1/webhook/stripe', 
+  express.raw({ type: 'application/json' }), // This ensures the body remains raw for webhooks
+  webhookRouter
 );
+
+// Regular middleware for other routes
+app.use(express.json()); // This should come AFTER the webhook route
+app.use(express.urlencoded({ extended: true }));
 
 // Data sanitization against NoSql query injection
 app.use(mongoSanitize());
@@ -78,100 +82,79 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Server has started!');
+  res.send('Server has started!!!!!!');
 });
 
 app.use((req, res, next) => {
   const userAgent = req.headers['user-agent'];
-  console.log(userAgent);
-  const appStoreURL = 'https://testflight.apple.com/join/fwMRsTzw'; // Replace with your App Store URL
+
+  // Define app store URLs and deep link URL
+  const appStoreURL = 'https://testflight.apple.com/join/fwMRsTzw'; // App Store URL
   const playStoreURL =
-    'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME'; // Replace with your Play Store URL
-  const deepLinkURL = 'yourappscheme://'; // Replace with your app's custom URL scheme
+    'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME'; // Play Store URL
+  const deepLinkURL = 'yourappscheme://'; // app's custom URL scheme
 
   // Check if the request path is intended for deep linking
   if (req.path.includes('api/v1')) {
-    // Adjust this check based on your deep link structure
-    if (/iPhone|iPad|iPod/i.test(userAgent)) {
-      // iOS device
-      console.log('IOS device');
-      res.send(`
-       <html>
-  <head>
-    <title>Redirecting...</title>
-    <style>
-      /* Basic styling for centering and button */
-      body {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background-color: #f9f9f9;
-        color: #333;
-      }
-      .container {
-        text-align: center;
-        padding: 20px;
-        background-color: #ffffff;
-        box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-      }
-      .button {
-        padding: 10px 20px;
-        margin-top: 20px;
-        background-color: #007aff;
-        color: #ffffff;
-        text-decoration: none;
-        font-size: 16px;
-        border-radius: 5px;
-      }
-      .button:hover {
-        background-color: #005bb5;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Redirecting to Quick Puff</h1>
-      <p>If the app doesnt open, you can download it below:</p>
-      <a href="${appStoreURL}" class="button">Download for iOS</a>
-    </div>
+    // Detect if coming from a mobile browser (not a native app)
+    const isMobileBrowser =
+      (/iPhone|iPad|iPod/i.test(userAgent) && /Safari/i.test(userAgent)) || // iOS Safari
+      (/Android/i.test(userAgent) && /Chrome/i.test(userAgent)); // Android Chrome or other browser
 
-    <script type="text/javascript">
-      // Attempt to open the app via the deep link
-      window.location.href = '${deepLinkURL}';
-      
-      // If the app isnt installed, show the download button after a short delay
-      setTimeout(function () {
-        document.querySelector('.container').style.display = 'block';
-      }, 500);
-    </script>
-  </body>
-</html>
-
-      `);
-    } else if (/Android/i.test(userAgent)) {
-      // Android device
-      res.send(`
-        <html>
-          <head>
-            <title>Redirecting...</title>
-          </head>
-          <body>
-            <script type="text/javascript">
-              window.location.href = '${deepLinkURL}';
-              setTimeout(function () {
-                window.location.href = '${playStoreURL}';
-              }, 500);
-            </script>
-          </body>
-        </html>
-      `);
+    if (isMobileBrowser) {
+      // Serve an HTML page with options to download or open the app
+      if (/iPhone|iPad|iPod/i.test(userAgent) && /Safari/i.test(userAgent)) {
+        res.send(`
+            <html>
+              <head>
+                <title>Get the App</title>
+                <style>
+                  body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                  .container { text-align: center; }
+                  .button { display: inline-block; padding: 15px 25px; margin: 10px; font-size: 16px; text-decoration: none; color: white; border-radius: 5px; }
+                  .app-store { background-color: #007aff; } /* iOS color */
+                  .play-store { background-color: #34a853; } /* Android color */
+                  .open-app { background-color: #333; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h2>Get Our App</h2>
+                  <p>Download the app from the store:</p>
+                  <a href="${appStoreURL}" class="button app-store">Download on App Store</a>
+                </div>
+              </body>
+            </html>
+          `);
+      } else if (/Android/i.test(userAgent) && /Chrome/i.test(userAgent)) {
+        res.send(`
+          <html>
+            <head>
+              <title>Get the App</title>
+              <style>
+                body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .container { text-align: center; }
+                .button { display: inline-block; padding: 15px 25px; margin: 10px; font-size: 16px; text-decoration: none; color: white; border-radius: 5px; }
+                .app-store { background-color: #007aff; } /* iOS color */
+                .play-store { background-color: #34a853; } /* Android color */
+                .open-app { background-color: #333; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h2>Get Our App</h2>
+                <p>Download the app from the store:</p>
+                <a href="${playStoreURL}" class="button play-store">Download on Play Store</a>
+              </div>
+            </body>
+          </html>
+        `);
+      } else {
+        next();
+      }
     } else {
-      // For other devices or if detection fails, redirect to a landing page or app website
-      res.redirect('https://yourappwebsite.com'); // Replace with your website or fallback page
+      // If not a mobile browser, bypass the middleware
+      next();
     }
   } else {
     // If the path is not a deep link, proceed as usual

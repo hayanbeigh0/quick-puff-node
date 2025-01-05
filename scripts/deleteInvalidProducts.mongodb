@@ -1,0 +1,101 @@
+// Delete products where the relationship between brand, brandCategory, product and productCategory is not valid
+db.products.aggregate([
+  // Lookup the brand associated with the product
+  {
+    $lookup: {
+      from: 'brands',
+      localField: 'brand',
+      foreignField: '_id',
+      as: 'brandDetails',
+    },
+  },
+  { $unwind: '$brandDetails' },
+
+  // Lookup the brand categories associated with the brand
+  {
+    $lookup: {
+      from: 'brandcategories',
+      localField: 'brandDetails.categories',
+      foreignField: '_id',
+      as: 'brandCategoryDetails',
+    },
+  },
+
+  // Lookup the product category associated with the product
+  {
+    $lookup: {
+      from: 'productcategories',
+      localField: 'productCategory',
+      foreignField: '_id',
+      as: 'productCategoryDetails',
+    },
+  },
+  { $unwind: '$productCategoryDetails' },
+
+  // Match products where their productCategory is NOT in any of the productCategories of the brandCategory
+  {
+    $match: {
+      $expr: {
+        $not: {
+          $anyElementTrue: {
+            $map: {
+              input: '$brandCategoryDetails',
+              as: 'brandCategory',
+              in: {
+                $in: ['$productCategory', '$$brandCategory.productCategories'],
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+
+  // Project only the product _id
+  {
+    $project: { _id: 1 },
+  },
+]).forEach((doc) => {
+  db.products.deleteOne({ _id: doc._id });
+});
+
+
+// Delete products where the brand or productCategory reference is missing
+db.products.aggregate([
+  // Lookup the brand associated with the product
+  {
+    $lookup: {
+      from: 'brands',
+      localField: 'brand',
+      foreignField: '_id',
+      as: 'brandDetails',
+    },
+  },
+
+  // Lookup the product category associated with the product
+  {
+    $lookup: {
+      from: 'productcategories',
+      localField: 'productCategory',
+      foreignField: '_id',
+      as: 'productCategoryDetails',
+    },
+  },
+
+  // Match products where the brand or productCategory reference is missing
+  {
+    $match: {
+      $or: [
+        { brandDetails: { $eq: [] } }, // Brand does not exist
+        { productCategoryDetails: { $eq: [] } }, // ProductCategory does not exist
+      ],
+    },
+  },
+
+  // Count the number of such products
+  {
+    $count: 'missingReferenceCount',
+  },
+]).forEach((doc) => {
+  db.products.deleteOne({ _id: doc._id });
+});

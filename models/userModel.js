@@ -85,18 +85,18 @@ const userSchema = new mongoose.Schema(
     },
     idVerificationStatus: {
       type: String,
-      enum: ['pending', 'initiated', 'verified', 'rejected'], // Possible states for verification
-      default: 'pending', // Default status
+      enum: ['pending', 'initiated', 'verified', 'rejected'],
+      default: 'pending',
     },
     idVerifiedBy: {
-      type: mongoose.Schema.Types.ObjectId, // Stores admin ID who verified/rejected
-      ref: 'User', // Assuming admins are also users
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
     idVerificationDate: {
-      type: Date, // Stores the date of verification or rejection
+      type: Date,
     },
     idVerificationComment: {
-      type: String, // Optional comment left by the admin
+      type: String,
     },
     idVerified: {
       type: Boolean,
@@ -109,7 +109,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    deliveryAddressLocations: [deliveryAddressLocationSchema], // Use the subdocument schema
+    deviceTokens: {
+      type: [String],
+    },
+    deliveryAddressLocations: [deliveryAddressLocationSchema],
     active: { type: Boolean, default: true, select: false },
   },
   {
@@ -131,7 +134,6 @@ const userSchema = new mongoose.Schema(
     },
   },
 );
-
 userSchema.index({ organisations: 1 });
 userSchema.index({ name: 1 });
 

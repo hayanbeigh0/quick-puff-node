@@ -8,5 +8,6 @@ router.post('/google-sign-in', authController.googleSignIn);
 router.post('/apple-sign-in', authController.appleSignIn);
 router.post('/email-sign-in', authController.signupOrSigninWithEmail);
 router.post('/email-sign-in/verify', authController.verifyAuthCode);
+router.post('/logout', authController.protect, authController.logout);
 
 module.exports = router;

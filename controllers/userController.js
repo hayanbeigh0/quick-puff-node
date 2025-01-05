@@ -1,8 +1,11 @@
 const User = require('../models/userModel');
+const Order = require('../models/orderModel');
+const Cart = require('../models/cartModel');
 
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const { uploadImage, getImageUrl } = require('../utils/cloudfs');
+const setTransaction = require('./transactionController');
 
 const updateProfile = catchAsync(async (req, res, next) => {
   const { firstName, lastName, dateOfBirth, phoneNumber } = req.body;
@@ -273,6 +276,186 @@ const getCurrentUser = catchAsync(async (req, res, next) => {
   });
 });
 
+const addDeviceToken = catchAsync(async (req, res, next) => {
+  const { deviceToken } = req.body;
+
+  if (!deviceToken) {
+    return next(new AppError('Device token is required', 400));
+  }
+
+  const normalizedToken = deviceToken.trim();
+
+  // Atomic update to add token only if it doesn't already exist
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $addToSet: { deviceTokens: normalizedToken } },
+    { new: true, runValidators: true },
+  );
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Device token added successfully',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const removeDeviceToken = catchAsync(async (req, res, next) => {
+  const { deviceToken } = req.body;
+
+  if (!deviceToken) {
+    return next(new AppError('Device token is required', 400));
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Remove the token if it exists
+  user.deviceTokens = user.deviceTokens.filter(
+    (token) => token !== deviceToken,
+  );
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Device token removed successfully',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const getDeviceTokens = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('deviceTokens');
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const cleanInvalidDeviceTokens = catchAsync(async (req, res, next) => {
+  const { invalidTokens } = req.body;
+
+  if (!Array.isArray(invalidTokens) || invalidTokens.length === 0) {
+    return next(new AppError('Invalid tokens array is required', 400));
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  // Remove all tokens that match the invalid tokens
+  user.deviceTokens = user.deviceTokens.filter(
+    (token) => !invalidTokens.includes(token),
+  );
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Invalid tokens removed successfully',
+    data: {
+      deviceTokens: user.deviceTokens,
+    },
+  });
+});
+
+const updateDeviceToken = catchAsync(async (req, res) => {
+  const { deviceToken } = req.body;
+
+  if (deviceToken) {
+    const user = await User.findById(req.user._id);
+
+    if (user && !user.deviceTokens.includes(deviceToken)) {
+      user.deviceTokens.push(deviceToken);
+      await user.save();
+    }
+  }
+  return;
+});
+
+const softDeleteUserAccount = catchAsync(async (req, res) => {
+  await User.findByIdAndUpdate(req.user._id, {
+    active: false,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Account deleted successfully!',
+  });
+});
+
+const deleteUserAndReassignOrders = setTransaction(async (req, res, next, session) => {
+  const userId = req.user._id;
+  const ghostUserId = '6720867c8c10a1a656c9dd97';
+
+  // Step 2: Reassign the user's orders to the ghost user
+  await Order.updateMany({ user: userId }, { $set: { user: ghostUserId } }).session(session);
+
+  // Step 3: Delete the user's cart
+  await Cart.deleteMany({ user: userId }).session(session);
+
+  // Step 4: Delete the user's delivery addresses (optional based on your requirements)
+  await User.updateOne(
+    { _id: userId },
+    { $set: { deliveryAddressLocations: [] } }
+  ).session(session);
+
+  // Step 5: Finally, delete the user
+  await User.deleteOne({ _id: userId }).session(session);
+
+  console.log(`User ${userId} deleted and data reassigned to ghost user.`);
+
+  return res.status(204).json({
+    status: 'success',
+    message: 'Account deleted successfully!',
+  });
+});
+
+const removeMultipleDeliveryAddressLocations = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('No user found with that id', 400));
+  }
+
+  const { deliveryLocationIds } = req.body;
+
+  if (!Array.isArray(deliveryLocationIds) || deliveryLocationIds.length === 0) {
+    return next(new AppError('Please provide an array of delivery location IDs', 400));
+  }
+
+  // Filter out the addresses that match the provided IDs
+  user.deliveryAddressLocations = user.deliveryAddressLocations.filter(
+    (location) => !deliveryLocationIds.includes(location._id.toString())
+  );
+
+  const updatedUser = await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      deliveryAddressLocations: updatedUser.deliveryAddressLocations,
+    },
+  });
+});
+
 module.exports = {
   updateProfile,
   addDeliveryAddressLocations,
@@ -285,4 +468,12 @@ module.exports = {
   getPendingVerifications,
   verifyOrRejectPhotoId,
   getCurrentUser,
+  removeDeviceToken,
+  addDeviceToken,
+  getDeviceTokens,
+  cleanInvalidDeviceTokens,
+  updateDeviceToken,
+  softDeleteUserAccount,
+  deleteUserAndReassignOrders,
+  removeMultipleDeliveryAddressLocations,
 };

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const validator = require('validator');
 
 const addressLocationSchema = new mongoose.Schema(
   {
@@ -52,6 +53,14 @@ const orderSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    createdByEmail: {
+      type: String,
+      required: [true, 'A Creator must have an email'],
+      unique: true,
+      lowercase: true,
+      validate: [validator.isEmail, 'Please provide a valid email'],
+      trim: true,
+    },
     items: [
       {
         product: {
@@ -81,8 +90,8 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
-      default: 'pending',
+      enum: ['pending', 'paid', 'failed', 'not_required'],
+      default: 'not_required'
     },
     transactionId: String,
     tipAmount: {
@@ -119,6 +128,8 @@ const orderSchema = new mongoose.Schema(
         'shipped',
         'delivered',
         'cancelled',
+        'failed',
+        'awaiting-payment',
         'ready-for-delivery',
         'out-for-delivery',
       ],
@@ -132,6 +143,9 @@ const orderSchema = new mongoose.Schema(
     ],
     deliveredAt: Date,
     orderNotes: String,
+    paymentIntentId: {
+      type: String,
+    },
   },
   {
     timestamps: true,
