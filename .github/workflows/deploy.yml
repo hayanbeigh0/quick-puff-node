@@ -3,7 +3,7 @@ name: CI/CD to Google Cloud VM
 on:
   push:
     branches:
-      - main # Adjust this to your deployment branch
+      - development # Adjust this to your deployment branch
 
 jobs:
   deploy:
