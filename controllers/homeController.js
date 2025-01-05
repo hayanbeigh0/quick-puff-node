@@ -19,13 +19,25 @@ const homePageData = catchAsync(async (req, res, next) => {
     return next(new AppError('Page and limit must be positive integers', 400));
   }
 
-  // Get all product categories for the response
-  const productCategories = await ProductCategory.find()
-    .select('name image')
-    .lean();
+  // Try to get product categories from cache
+  let productCategories = productCategoryCache.get('allProductCategories');
+  let totalProductCategories;
 
-  // Get total count of product categories
-  const totalProductCategories = await ProductCategory.countDocuments();
+  if (!productCategories) {
+    // If not in cache, fetch from database
+    productCategories = await ProductCategory.find()
+      .select('name image')
+      .lean();
+
+    totalProductCategories = productCategories.length;
+
+    // Cache the results for 1 hour (3600 seconds)
+    productCategoryCache.set('allProductCategories', productCategories);
+    productCategoryCache.set('totalProductCategories', totalProductCategories);
+  } else {
+    // Get total count from cache
+    totalProductCategories = productCategoryCache.get('totalProductCategories');
+  }
 
   // Get brands and their products for each product category
   const brandsData = await ProductCategory.aggregate([
@@ -254,6 +266,13 @@ const homePageData = catchAsync(async (req, res, next) => {
   res.status(200).json(response);
 });
 
+// Add a function to clear the cache when product categories are updated
+const clearProductCategoriesCache = () => {
+  productCategoryCache.del('allProductCategories');
+  productCategoryCache.del('totalProductCategories');
+};
+
 module.exports = {
   homePageData,
+  clearProductCategoriesCache
 };
