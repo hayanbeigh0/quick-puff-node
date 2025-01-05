@@ -3,8 +3,8 @@ const ProductCategory = require('../models/productCategoryModel');
 const Brand = require('../models/brandModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
-const NodeCache = require('node-cache');
-const productCategoryCache = new NodeCache({ stdTTL: 3600 });
+const { cacheInstances, CACHE_KEYS } = require('../utils/cacheManager');
+const { productCategoryCache } = cacheInstances;
 
 /**
  * Controller function to fetch and structure homepage data.
