@@ -1,6 +1,4 @@
-const BrandCategory = require('../models/brandCategoryModel');
 const ProductCategory = require('../models/productCategoryModel');
-const Brand = require('../models/brandModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const { cacheInstances, CACHE_KEYS } = require('../utils/cacheManager');
@@ -153,6 +151,7 @@ const homePageData = catchAsync(async (req, res, next) => {
     {
       $project: {
         _id: 0,
+        id: '',
         brandCategoryName: { $concat: ['$name', ' Brands'] },
         brands: {
           $map: {
