@@ -17,7 +17,7 @@ const brandSchema = new mongoose.Schema(
     categories: [
       {
         type: mongoose.Schema.ObjectId,
-        ref: 'BrandCategory',
+        ref: 'ProductCategory',
       },
     ],
   },

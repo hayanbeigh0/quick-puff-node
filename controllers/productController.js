@@ -32,17 +32,11 @@ const validateProductData = catchAsync(async (req, res, next) => {
     return next(new AppError('ProductCategory does not exist', 404));
   }
 
-  // Step 3: Check if the brand is associated with any BrandCategory that links to the ProductCategory
-  const validBrandCategoryFound = await BrandCategory.findOne({
-    _id: { $in: brandExists.categories },
-    productCategories: { $in: [productCategory] }
-  });
-
-  if (!validBrandCategoryFound) {
-    return next(new AppError('No valid BrandCategory linked to the ProductCategory for this Brand', 400));
+  // Step 3: Check if the brand is directly associated with the ProductCategory
+  if (!brandExists.categories.includes(productCategory)) {
+    return next(new AppError('Brand is not associated with this ProductCategory', 400));
   }
 
-  // If all validations pass, proceed to the next middleware or route handler
   next();
 });
 
