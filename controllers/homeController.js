@@ -12,7 +12,7 @@ const productCategoryCache = new NodeCache({ stdTTL: 3600 });
  */
 const homePageData = catchAsync(async (req, res, next) => {
   const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 10;
+  const limit = parseInt(req.query.limit, 10) || 2;
   const brandLimit = parseInt(req.query.brandLimit, 10) || 8;
 
   if (page < 1 || limit < 1) {
