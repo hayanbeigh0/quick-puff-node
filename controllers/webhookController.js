@@ -4,6 +4,7 @@ const User = require('../models/userModel');
 const Cart = require('../models/cartModel');
 const Product = require('../models/productModel');
 const { sendNotification } = require('../notifications');
+const { clearProductRelatedCaches } = require('../utils/cacheManager');
 
 const stripeWebhookHandler = async (req, res) => {
     let event;
@@ -54,6 +55,9 @@ const stripeWebhookHandler = async (req, res) => {
                         console.error('Notification error:', notificationError);
                     }
                 }
+
+                // After processing payment and updating stocks
+                clearProductRelatedCaches();
                 break;
             }
 

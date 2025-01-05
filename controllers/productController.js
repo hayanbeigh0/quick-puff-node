@@ -9,6 +9,11 @@ const {
   deleteImage,
   extractPublicIdFromUrl,
 } = require('../utils/cloudfs');
+const { 
+  clearProductCache, 
+  clearHomeCache,
+  clearAllCache  // For major changes that affect multiple areas
+} = require('../utils/cacheManager');
 const RecentSearch = require('../models/recentSearchModel');
 
 const Brand = require('../models/brandModel');
@@ -39,6 +44,12 @@ const validateProductData = catchAsync(async (req, res, next) => {
 
   next();
 });
+
+// Helper function to clear caches after product changes
+const clearProductRelatedCaches = () => {
+  clearProductCache();
+  clearHomeCache();
+};
 
 // Controller function to handle product creation
 const createProduct = catchAsync(async (req, res, next) => {
@@ -110,6 +121,9 @@ const createProduct = catchAsync(async (req, res, next) => {
 
   // Create the product
   const product = await Product.create(productData);
+
+  // Clear caches after creating new product
+  clearProductRelatedCaches();
 
   // Respond with the newly created product
   res.status(201).json({
@@ -214,6 +228,9 @@ const updateProduct = catchAsync(async (req, res, next) => {
       runValidators: true, // Run validators on the update
     },
   );
+
+  // Clear caches after updating product
+  clearProductRelatedCaches();
 
   res.status(200).json({
     status: 'success',
@@ -320,6 +337,9 @@ const deleteProduct = catchAsync(async (req, res, next) => {
 
   // Delete the product from the database
   await Product.findByIdAndDelete(productId);
+
+  // Clear caches after deleting product
+  clearProductRelatedCaches();
 
   res.status(204).json({
     status: 'success',

@@ -11,6 +11,7 @@ const setTransaction = require('../controllers/transactionController');
 const geolib = require('geolib');
 const FulfillmentCenter = require('../models/fulfillmentCenterModel');
 const { sendNotification } = require('../notifications');
+const { clearProductRelatedCaches } = require('../utils/cacheManager');
 
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -302,6 +303,9 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     status: 'success',
     order: populatedOrder
   });
+
+  // After updating product stocks
+  clearProductRelatedCaches();
 });
 
 const getAdditionalCharges = setTransaction(async (req, res, next, session) => {

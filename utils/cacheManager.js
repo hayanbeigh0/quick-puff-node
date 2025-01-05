@@ -42,6 +42,13 @@ const clearAllCache = () => {
   console.log('All caches cleared');
 };
 
+// Helper function for clearing product-related caches
+const clearProductRelatedCaches = () => {
+  clearProductCache();
+  clearHomeCache();
+  // Add any other caches that might be affected by product changes
+};
+
 // Export cache instances
 const cacheInstances = {
   productCategoryCache,
@@ -57,5 +64,6 @@ module.exports = {
   clearProductCache,
   clearBrandCache,
   clearHomeCache,
-  clearAllCache
+  clearAllCache,
+  clearProductRelatedCaches
 }; 
