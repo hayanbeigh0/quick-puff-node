@@ -35,7 +35,7 @@ jobs:
             npm install
 
             # Start the app with a specific name
-            pm2 start server.js --name "server-prod" || pm2 restart "server-prod"
+            pm2 start server.js --name "server" || pm2 restart "server"
 
             pm2 save  # Save the pm2 process list
             exit
@@ -69,7 +69,7 @@ jobs:
             npm install
 
             # Start the app with a specific name
-            pm2 start server.js --name "server-dev" || pm2 restart "server-dev"
+            pm2 start server.js --name "server" || pm2 restart "server"
 
             pm2 save  # Save the pm2 process list
             exit
