@@ -1,167 +1,295 @@
-const BrandCategory = require('../models/brandCategoryModel');
 const ProductCategory = require('../models/productCategoryModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
-const NodeCache = require('node-cache');
-const productCategoryCache = new NodeCache({ stdTTL: 3600 });
+const { cacheInstances, CACHE_KEYS } = require('../utils/cacheManager');
+const { productCategoryCache } = cacheInstances;
 
 /**
- * Controller function to fetch and structure homepage data using an aggregation pipeline.
- * The data includes product categories, brand categories, brands, and products.
- * Aggregation Pipeline for Brands and Products:
-
-    The pipeline performs the following operations:
-    $lookup for Brands: Joins the brands collection with the BrandCategory based on the category ID. 
-    The pipeline inside the $lookup projects each brand's _id as id and excludes the original _id.
-    $lookup for Products: Joins the products collection with the BrandCategory based on product category IDs.
-     A facet is used to limit the products to 10 and count the total number of products.
-    Remaining Items Calculation: Calculates the number of remaining items by subtracting 10 
-    (the number of products retrieved) from the total product count.
-    $addFields and $project: Fields like id, brandCategoryName, brands, and brandCategoryProducts are added to the 
-    final output, and unnecessary fields like _id are excluded.
+ * Controller function to fetch and structure homepage data.
+ * The data includes product categories and associated brands and products.
  */
-
 const homePageData = catchAsync(async (req, res, next) => {
-  // Extract pagination parameters from query string
-  const page = parseInt(req.query.page, 10) || 1; // Default to page 1
-  const limit = parseInt(req.query.limit, 10) || 2; // Default to 10 items per page
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 2;
+  const brandLimit = parseInt(req.query.brandLimit, 10) || 8;
 
-  // Ensure page and limit are positive integers
   if (page < 1 || limit < 1) {
     return next(new AppError('Page and limit must be positive integers', 400));
   }
 
-  // Check if data is in cache
-  let productCategories = productCategoryCache.get('productCategories');
+  // Get all product categories first (limited to 6)
+  const productCategories = await ProductCategory.find()
+    .select('name image')
+    .sort({ name: 1 })
+    .limit(6)
+    .lean()
+    .then(categories => categories.map(cat => ({
+      name: cat.name,
+      image: cat.image,
+      id: cat._id
+    })));
 
-  if (!productCategories) {
-    // Fetch from database if not in cache
-    productCategories = await ProductCategory.find()
-      .select('name image _id')
-      .limit(6)
-      .lean();
-    // Rename _id to id
-    productCategories = productCategories.map((category) => ({
-      ...category,
-      id: category._id,
-      _id: undefined, // Remove the _id field
-    }));
-    // Store data in cache
-    productCategoryCache.set('productCategories', productCategories);
-  }
-
-  // 2. Use aggregation pipeline to fetch brand categories, brands, and products with pagination
-  const brandsData = await BrandCategory.aggregate([
+  // Get brands and products for the same categories
+  const brandsData = await ProductCategory.aggregate([
+    // Match only the categories we got above
     {
-      $lookup: {
-        from: 'brands',
-        localField: '_id',
-        foreignField: 'categories',
-        as: 'brands',
-        pipeline: [
-          {
-            $project: {
-              id: '$_id', // Create `id` from `_id`
-              name: 1,
-              image: 1,
-              _id: 0, // Exclude `_id`
-            },
-          },
-        ],
-      },
+      $match: {
+        _id: { $in: productCategories.map(cat => cat.id) }
+      }
+    },
+    // Sort to maintain same order
+    {
+      $sort: { name: 1 }
+    },
+    // Apply pagination
+    {
+      $skip: (page - 1) * limit
     },
     {
-      $lookup: {
-        from: 'products',
-        let: { productCategoryIds: '$productCategories' },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $in: ['$productCategory', '$$productCategoryIds'] },
-            },
-          },
-          {
-            $lookup: {
-              from: 'productcategories', // Lookup for product category information
-              localField: 'productCategory',
-              foreignField: '_id',
-              as: 'productCategoryInfo',
-            },
-          },
-          {
-            $unwind: '$productCategoryInfo', // Unwind the product category array
-          },
-          {
-            $facet: {
-              products: [
-                { $limit: 10 }, // Fetch only 10 products
-                {
-                  $project: {
-                    id: '$_id', // Create `id` from `_id`
-                    name: 1,
-                    image: 1,
-                    price: 1,
-                    quantity: 1,
-                    volume: 1,
-                    stock: 1,
-                    productCategory: '$productCategoryInfo.name', // Include product category name
-                    productCategoryId: '$productCategoryInfo._id', // Include product category id
-                    _id: 0, // Exclude `_id`
-                  },
-                },
-              ],
-              totalCount: [{ $count: 'count' }], // Count total items
-            },
-          },
-          {
-            $addFields: {
-              remainingItems: {
-                $let: {
-                  vars: {
-                    totalItems: { $arrayElemAt: ['$totalCount.count', 0] },
-                  },
-                  in: { $max: [{ $subtract: ['$$totalItems', 10] }, 0] }, // Ensure non-negative remainingItems
-                },
-              },
-              productCategory: { $first: '$products.productCategory' }, // Add category of products
-              productCategoryId: { $first: '$products.productCategoryId' }, // Add product category id
-            },
-          },
-          {
-            $project: {
-              totalCount: 0, // Exclude totalCount from the final output
-            },
-          },
-        ],
-        as: 'brandCategoryProducts',
-      },
+      $limit: limit
     },
     {
       $addFields: {
-        id: '$_id', // Create `id` from `_id`
-      },
+        productCategoryId: '$_id'
+      }
     },
+    // Look up brands that have this product category
+    {
+      $lookup: {
+        from: 'brands',
+        let: { categoryId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $in: ['$$categoryId', '$categories']
+              }
+            }
+          },
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              image: 1
+            }
+          },
+          // Always limit brands to brandLimit
+          {
+            $limit: brandLimit
+          }
+        ],
+        as: 'brands'
+      }
+    },
+    // Look up products for each brand in this category
+    {
+      $lookup: {
+        from: 'products',
+        let: { 
+          categoryId: '$_id',
+          categoryName: '$name'
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ['$productCategory', '$$categoryId']
+              }
+            }
+          },
+          {
+            $addFields: {
+              productCategory: '$$categoryName',
+              productCategoryId: '$$categoryId'
+            }
+          },
+          {
+            $sort: { createdAt: -1 }
+          },
+          {
+            $group: {
+              _id: '$brand',
+              products: {
+                $push: {
+                  id: '$_id',
+                  name: '$name',
+                  image: '$image',
+                  price: '$price',
+                  quantity: '$quantity',
+                  stock: '$stock',
+                  productCategory: '$productCategory',
+                  productCategoryId: '$productCategoryId'
+                }
+              }
+            }
+          },
+          {
+            $project: {
+              products: { $slice: ['$products', 0, limit] }
+            }
+          }
+        ],
+        as: 'brandProducts'
+      }
+    },
+    // Count total products for each brand in this category
+    {
+      $lookup: {
+        from: 'products',
+        let: { categoryId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ['$productCategory', '$$categoryId']
+              }
+            }
+          },
+          {
+            $group: {
+              _id: '$brand',
+              count: { $sum: 1 }
+            }
+          }
+        ],
+        as: 'brandProductCounts'
+      }
+    },
+    // Filter brands to only those with products
+    {
+      $addFields: {
+        brands: {
+          $filter: {
+            input: '$brands',
+            as: 'brand',
+            cond: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: '$brandProductCounts',
+                      as: 'count',
+                      cond: { $eq: ['$$count._id', '$$brand._id'] }
+                    }
+                  }
+                },
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    // Format the output
     {
       $project: {
-        _id: 0, // Exclude `_id`
-        id: 1, // Include `id`
-        brandCategoryName: '$name',
-        brands: 1,
-        brandCategoryProducts: 1,
-      },
+        _id: 0,
+        id: '$_id',
+        brandCategoryName: { $concat: ['$name', ' brands'] },
+        brands: {
+          $map: {
+            input: '$brands',
+            as: 'brand',
+            in: {
+              name: '$$brand.name',
+              image: '$$brand.image',
+              id: '$$brand._id'
+            }
+          }
+        },
+        brandCategoryProducts: {
+          $map: {
+            input: '$brands',
+            as: 'brand',
+            in: {
+              products: {
+                $let: {
+                  vars: {
+                    brandProducts: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$brandProducts',
+                            as: 'bp',
+                            cond: { $eq: ['$$bp._id', '$$brand._id'] }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  },
+                  in: '$$brandProducts.products'
+                }
+              },
+              remainingItems: {
+                $let: {
+                  vars: {
+                    brandCount: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$brandProductCounts',
+                            as: 'count',
+                            cond: { $eq: ['$$count._id', '$$brand._id'] }
+                          }
+                        },
+                        0
+                      ]
+                    },
+                    brandProducts: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$brandProducts',
+                            as: 'bp',
+                            cond: { $eq: ['$$bp._id', '$$brand._id'] }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  },
+                  in: {
+                    $max: [
+                      {
+                        $subtract: [
+                          { $ifNull: ['$$brandCount.total', 0] },
+                          {
+                            $size: {
+                              $ifNull: [
+                                '$$brandProducts.products',
+                                []
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      0
+                    ]
+                  }
+                }
+              },
+              productCategory: '$name',
+              productCategoryId: '$_id'
+            }
+          }
+        }
+      }
     },
+    // Add this new stage to filter out empty results
     {
-      $skip: (page - 1) * limit, // Skip the documents for the current page
-    },
-    {
-      $limit: limit, // Limit the number of documents per page
-    },
+      $match: {
+        $and: [
+          { 'brands.0': { $exists: true } },  // Only include if brands array is not empty
+          { 'brandCategoryProducts.0': { $exists: true } }  // Only include if brandCategoryProducts array is not empty
+        ]
+      }
+    }
   ]);
 
-  // 3. Get the total count of brand categories
-  const totalBrandCategories = await BrandCategory.countDocuments();
+  // Get total count for pagination
+  const totalProductCategories = productCategories.length;
 
-  // 4. Create the final response structure
   const response = {
     status: 'success',
     productCategories,
@@ -169,15 +297,21 @@ const homePageData = catchAsync(async (req, res, next) => {
     pageInfo: {
       page,
       limit,
-      totalPages: Math.ceil(totalBrandCategories / limit),
-      totalItems: totalBrandCategories,
-    },
+      totalPages: Math.ceil(totalProductCategories / limit),
+      totalItems: totalProductCategories
+    }
   };
 
-  // 5. Send the response back to the client
   res.status(200).json(response);
 });
 
+// Add a function to clear the cache when product categories are updated
+const clearProductCategoriesCache = () => {
+  productCategoryCache.del('allProductCategories');
+  productCategoryCache.del('totalProductCategories');
+};
+
 module.exports = {
   homePageData,
+  clearProductCategoriesCache
 };

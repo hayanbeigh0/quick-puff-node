@@ -8,6 +8,7 @@ const {
   deleteImage,
   extractPublicIdFromUrl,
 } = require('../utils/cloudfs');
+const { clearProductCategoriesCache, clearHomeCache } = require('../utils/cacheManager');
 
 // Controller function to handle product category creation
 const createProductCategory = catchAsync(async (req, res, next) => {
@@ -21,6 +22,10 @@ const createProductCategory = catchAsync(async (req, res, next) => {
     image: assetInfo, // Store the image URL in the image property
     description: req.body.description,
   });
+
+  // Clear related caches
+  clearProductCategoriesCache();
+  clearHomeCache();
 
   res.status(201).json({
     status: 'success',
@@ -70,6 +75,9 @@ const updateProductCategory = catchAsync(async (req, res, next) => {
     },
   );
 
+  // Clear the cache after updating
+  clearProductCategoriesCache();
+
   res.status(200).json({
     status: 'success',
     data: {
@@ -93,6 +101,9 @@ const deleteProductCategory = catchAsync(async (req, res, next) => {
 
   // Delete the product from the database
   await ProductCategory.findByIdAndDelete(categoryId);
+
+  // Clear the cache after deleting
+  clearProductCategoriesCache();
 
   res.status(204).json({
     status: 'success',

@@ -1,12 +1,14 @@
-name: CI/CD to Google Cloud VM
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
-      - main # Adjust this to your deployment branch
+      - main
+      - development
 
 jobs:
-  deploy:
+  deploy-to-production:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -18,7 +20,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy to GC VM
+      - name: Deploy to GC VM Production
         env:
           HOST: 34.44.225.81
           USERNAME: quickpuff795
@@ -28,17 +30,31 @@ jobs:
             cd /home/quickpuff795/quick-puff-node
 
             # Run deployment commands
+            git checkout main
             git pull origin main
             npm install
 
-            # Start the app with a specific name (pm2 will handle it correctly now)
+            # Start the app with a specific name
             pm2 start server.js --name "server" || pm2 restart "server"
 
             pm2 save  # Save the pm2 process list
             exit
           EOF
 
-      - name: Deploy to AWS EC2
+  deploy-to-development:
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Start SSH Agent and Add SSH Key
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to AWS EC2 Development
         env:
           HOST_VM2: 65.0.104.81
           USERNAME_VM2: ubuntu
@@ -52,7 +68,7 @@ jobs:
             git pull origin development
             npm install
 
-            # Start the app with a specific name (pm2 will handle it correctly now)
+            # Start the app with a specific name
             pm2 start server.js --name "server" || pm2 restart "server"
 
             pm2 save  # Save the pm2 process list
