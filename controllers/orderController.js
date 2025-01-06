@@ -1001,6 +1001,7 @@ const initiatePayment = catchAsync(async (req, res, next) => {
     res.status(200).json({
       status: 'success',
       paymentIntent: {
+        id: paymentIntent.id,
         clientSecret: paymentIntent.client_secret,
         publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
       }
