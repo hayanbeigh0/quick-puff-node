@@ -15,7 +15,7 @@ const getBrandsAndProductsByBrandCategory = catchAsync(async (req, res, next) =>
     const { productCategoryId } = req.params;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 8;
-    const productsLimit = parseInt(req.query.productsLimit, 10) || 20;
+    const productsLimit = parseInt(req.query.productsLimit, 10) || 10;
 
   const cacheKey = `category-${productCategoryId}-page-${page}-limit-${limit}`;
 
@@ -31,23 +31,73 @@ const getBrandsAndProductsByBrandCategory = catchAsync(async (req, res, next) =>
     return next(new AppError('Product category not found', 404));
   }
 
-  // Find brands that have this product category
-  const brands = await Brand.find({
-    categories: { $in: [productCategoryId] }
-  })
-    .select('name image _id')
-    .lean();
+  // Find brands that have products in this category
+  const brandsWithProducts = await Brand.aggregate([
+    {
+      $match: {
+        categories: { $in: [new mongoose.Types.ObjectId(productCategoryId)] }
+      }
+    },
+    // Look up products for each brand
+    {
+      $lookup: {
+        from: 'products',
+        let: { brandId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$brand', '$$brandId'] },
+                  { $eq: ['$productCategory', new mongoose.Types.ObjectId(productCategoryId)] }
+                ]
+              }
+            }
+          }
+        ],
+        as: 'products'
+      }
+    },
+    // Only keep brands that have products
+    {
+      $match: {
+        'products.0': { $exists: true }
+      }
+    },
+    // Pagination
+    {
+      $skip: (page - 1) * limit
+    },
+    {
+      $limit: limit
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        image: 1
+      }
+    }
+  ]);
 
-  // Get products for each brand in this category
-  const brandsWithProducts = await Promise.all(
-    brands.map(async (brand) => {
+  // Get products for each brand
+  const brandsWithProductDetails = await Promise.all(
+    brandsWithProducts.map(async (brand) => {
       const products = await Product.find({
         brand: brand._id,
         productCategory: productCategoryId
       })
-        .select('name image price _id stock quantity')
-        .limit(productsLimit)
-        .lean();
+      .select('name image price stock quantity')
+      .lean()
+      .limit(productsLimit)
+      .then(products => products.map(product => ({
+        id: product._id,
+        name: product.name,
+        image: product.image,
+        price: product.price,
+        stock: product.stock,
+        quantity: product.quantity
+      })));
 
       const totalProducts = await Product.countDocuments({
         brand: brand._id,
@@ -64,25 +114,56 @@ const getBrandsAndProductsByBrandCategory = catchAsync(async (req, res, next) =>
     })
   );
 
-  const totalBrands = await Brand.countDocuments({
-    categories: productCategoryId
-  });
+  // Get total count of brands with products
+  const totalBrands = await Brand.aggregate([
+    {
+      $match: {
+        categories: { $in: [new mongoose.Types.ObjectId(productCategoryId)] }
+      }
+    },
+    {
+      $lookup: {
+        from: 'products',
+        let: { brandId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$brand', '$$brandId'] },
+                  { $eq: ['$productCategory', new mongoose.Types.ObjectId(productCategoryId)] }
+                ]
+              }
+            }
+          }
+        ],
+        as: 'products'
+      }
+    },
+    {
+      $match: {
+        'products.0': { $exists: true }
+      }
+    },
+    {
+      $count: 'total'
+    }
+  ]);
 
-  // Format the response to match the previous structure
   const response = {
     status: 'success',
     brandCategoryName: productCategory.name,
-    brands: brands.map(brand => ({
+    brands: brandsWithProducts.map(brand => ({
       name: brand.name,
       image: brand.image,
       id: brand._id
     })),
-    brandsAndProducts: brandsWithProducts,
+    brandsAndProducts: brandsWithProductDetails,
     pageInfo: {
       page,
       limit,
-      totalPages: Math.ceil(totalBrands / limit),
-      totalItems: totalBrands
+      totalPages: Math.ceil((totalBrands[0]?.total || 0) / limit),
+      totalItems: totalBrands[0]?.total || 0
     }
   };
 
@@ -142,10 +223,28 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
     brand: brandId,
     productCategory: productCategoryId
   })
-    .select('name image price _id stock')
+    .select('name image price stock quantity nicotineStrength averageRating flavor hasDeal')
+    .populate('flavor', 'name createdAt updatedAt')
+    .lean()
     .skip((page - 1) * limit)
     .limit(limit)
-    .lean();
+    .then(products => products.map(product => ({
+      id: product._id,
+      name: product.name,
+      image: product.image,
+      price: product.price,
+      stock: product.stock,
+      quantity: product.quantity,
+      nicotineStrength: product.nicotineStrength || 0,
+      averageRating: product.averageRating || 0,
+      flavor: product.flavor ? {
+        id: product.flavor._id,
+        name: product.flavor.name,
+        createdAt: product.flavor.createdAt,
+        updatedAt: product.flavor.updatedAt
+      } : null,
+      hasDeal: product.hasDeal || false
+    })));
 
   const totalProducts = await Product.countDocuments({
     brand: brandId,

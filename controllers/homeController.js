@@ -17,33 +17,31 @@ const homePageData = catchAsync(async (req, res, next) => {
     return next(new AppError('Page and limit must be positive integers', 400));
   }
 
-  // Try to get product categories from cache
-  let productCategories = productCategoryCache.get('allProductCategories');
-  let totalProductCategories;
+  // Get all product categories first (limited to 6)
+  const productCategories = await ProductCategory.find()
+    .select('name image')
+    .sort({ name: 1 })
+    .limit(6)
+    .lean()
+    .then(categories => categories.map(cat => ({
+      name: cat.name,
+      image: cat.image,
+      id: cat._id
+    })));
 
-  if (!productCategories) {
-    // If not in cache, fetch from database
-    productCategories = await ProductCategory.find()
-      .select('name image')
-      .lean();
-
-    totalProductCategories = productCategories.length;
-
-    // Cache the results for 1 hour (3600 seconds)
-    productCategoryCache.set('allProductCategories', productCategories);
-    productCategoryCache.set('totalProductCategories', totalProductCategories);
-  } else {
-    // Get total count from cache
-    totalProductCategories = productCategoryCache.get('totalProductCategories');
-  }
-
-  // Get brands and their products for each product category
+  // Get brands and products for the same categories
   const brandsData = await ProductCategory.aggregate([
-    // Sort product categories (optional, add your preferred sorting)
+    // Match only the categories we got above
+    {
+      $match: {
+        _id: { $in: productCategories.map(cat => cat.id) }
+      }
+    },
+    // Sort to maintain same order
     {
       $sort: { name: 1 }
     },
-    // Apply pagination to product categories first
+    // Apply pagination
     {
       $skip: (page - 1) * limit
     },
@@ -87,13 +85,22 @@ const homePageData = catchAsync(async (req, res, next) => {
     {
       $lookup: {
         from: 'products',
-        let: { categoryId: '$_id' },
+        let: { 
+          categoryId: '$_id',
+          categoryName: '$name'
+        },
         pipeline: [
           {
             $match: {
               $expr: {
                 $eq: ['$productCategory', '$$categoryId']
               }
+            }
+          },
+          {
+            $addFields: {
+              productCategory: '$$categoryName',
+              productCategoryId: '$$categoryId'
             }
           },
           {
@@ -104,20 +111,21 @@ const homePageData = catchAsync(async (req, res, next) => {
               _id: '$brand',
               products: {
                 $push: {
-                  _id: '$_id',
+                  id: '$_id',
                   name: '$name',
                   image: '$image',
                   price: '$price',
                   quantity: '$quantity',
                   stock: '$stock',
-                  brand: '$brand'
+                  productCategory: '$productCategory',
+                  productCategoryId: '$productCategoryId'
                 }
               }
             }
           },
           {
             $project: {
-              products: { $slice: ['$products', 0, limit] } // Use the same limit for products
+              products: { $slice: ['$products', 0, limit] }
             }
           }
         ],
@@ -140,27 +148,52 @@ const homePageData = catchAsync(async (req, res, next) => {
           {
             $group: {
               _id: '$brand',
-              total: { $sum: 1 }
+              count: { $sum: 1 }
             }
           }
         ],
         as: 'brandProductCounts'
       }
     },
+    // Filter brands to only those with products
+    {
+      $addFields: {
+        brands: {
+          $filter: {
+            input: '$brands',
+            as: 'brand',
+            cond: {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: '$brandProductCounts',
+                      as: 'count',
+                      cond: { $eq: ['$$count._id', '$$brand._id'] }
+                    }
+                  }
+                },
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
     // Format the output
     {
       $project: {
         _id: 0,
-        id: '',
-        brandCategoryName: { $concat: ['$name', ' Brands'] },
+        id: '$_id',
+        brandCategoryName: { $concat: ['$name', ' brands'] },
         brands: {
           $map: {
             input: '$brands',
             as: 'brand',
             in: {
-              id: '$$brand._id',
               name: '$$brand.name',
-              image: '$$brand.image'
+              image: '$$brand.image',
+              id: '$$brand._id'
             }
           }
         },
@@ -169,9 +202,6 @@ const homePageData = catchAsync(async (req, res, next) => {
             input: '$brands',
             as: 'brand',
             in: {
-              id: '$$brand._id',
-              name: '$$brand.name',
-              image: '$$brand.image',
               products: {
                 $let: {
                   vars: {
@@ -238,21 +268,31 @@ const homePageData = catchAsync(async (req, res, next) => {
                     ]
                   }
                 }
-              }
+              },
+              productCategory: '$name',
+              productCategoryId: '$_id'
             }
           }
         }
       }
+    },
+    // Add this new stage to filter out empty results
+    {
+      $match: {
+        $and: [
+          { 'brands.0': { $exists: true } },  // Only include if brands array is not empty
+          { 'brandCategoryProducts.0': { $exists: true } }  // Only include if brandCategoryProducts array is not empty
+        ]
+      }
     }
   ]);
 
+  // Get total count for pagination
+  const totalProductCategories = productCategories.length;
+
   const response = {
     status: 'success',
-    productCategories: productCategories.map(cat => ({
-      id: cat._id,
-      name: cat.name,
-      image: cat.image
-    })),
+    productCategories,
     brandsAndProducts: brandsData,
     pageInfo: {
       page,
