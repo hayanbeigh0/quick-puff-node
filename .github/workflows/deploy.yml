@@ -40,7 +40,7 @@ jobs:
 
       - name: Deploy to AWS EC2
         env:
-          HOST_VM2: 13.127.53.137
+          HOST_VM2: 65.0.104.81
           USERNAME_VM2: ubuntu
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.USERNAME_VM2 }}@${{ env.HOST_VM2 }} << 'EOF'
@@ -48,7 +48,8 @@ jobs:
             cd /home/ubuntu/quick-puff-node
 
             # Run deployment commands
-            git pull origin main
+            git checkout development
+            git pull origin development
             npm install
 
             # Start the app with a specific name (pm2 will handle it correctly now)
