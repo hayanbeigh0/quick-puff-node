@@ -33,7 +33,7 @@ const stripeWebhookHandler = async (req, res) => {
                     return res.json({ received: true });
                 }
 
-                // Just update payment status - cart is already cleared
+                // Update order status first
                 order.paymentStatus = 'paid';
                 order.status = 'pending';
                 order.statusHistory.push({
@@ -42,21 +42,24 @@ const stripeWebhookHandler = async (req, res) => {
                 });
                 await order.save();
 
-                // Send notification to user
-                const user = await User.findById(order.user);
-                if (user?.deviceTokens?.length > 0) {
-                    try {
-                        await sendNotification(
-                            user.deviceTokens,
-                            'Payment Successful!',
-                            `Your payment for order ${order.orderNumber} has been confirmed.`
-                        );
-                    } catch (notificationError) {
-                        console.error('Notification error:', notificationError);
-                    }
-                }
+                // Send notification to user - wrapped in try-catch and moved after critical operations
+                // const user = await User.findById(order.user);
+                // if (user?.deviceTokens?.length > 0) {
+                //     try {
+                //         for (const token of user.deviceTokens) {
+                //             await sendNotification(
+                //                 [token], // Send to single token at a time
+                //                 'Payment Successful!',
+                //                 `Your payment for order ${order.orderNumber} has been confirmed.`
+                //             );
+                //         }
+                //     } catch (notificationError) {
+                //         console.error('Notification error:', notificationError);
+                //         // Don't throw the error - just log it
+                //     }
+                // }
 
-                // After processing payment and updating stocks
+                // Clear caches after all operations
                 clearProductRelatedCaches();
                 break;
             }
@@ -108,11 +111,13 @@ const stripeWebhookHandler = async (req, res) => {
                 const user = await User.findById(order.user);
                 if (user?.deviceTokens?.length > 0) {
                     try {
-                        await sendNotification(
-                            user.deviceTokens,
-                            'Payment Failed',
-                            `Your payment for order ${order.orderNumber} was unsuccessful. Your cart has been restored.`
-                        );
+                        for (const token of user.deviceTokens) {
+                            await sendNotification(
+                                [token],
+                                'Payment Failed',
+                                `Your payment for order ${order.orderNumber} was unsuccessful. Your cart has been restored.`
+                            );
+                        }
                     } catch (notificationError) {
                         console.error('Notification error:', notificationError);
                     }
@@ -166,11 +171,13 @@ const stripeWebhookHandler = async (req, res) => {
                 const user = await User.findById(order.user);
                 if (user?.deviceTokens?.length > 0) {
                     try {
-                        await sendNotification(
-                            user.deviceTokens,
-                            'Payment Cancelled',
-                            `Your payment for order ${order.orderNumber} was cancelled. Your cart has been restored.`
-                        );
+                        for (const token of user.deviceTokens) {
+                            await sendNotification(
+                                [token],
+                                'Payment Cancelled',
+                                `Your payment for order ${order.orderNumber} was cancelled. Your cart has been restored.`
+                            );
+                        }
                     } catch (notificationError) {
                         console.error('Notification error:', notificationError);
                     }
