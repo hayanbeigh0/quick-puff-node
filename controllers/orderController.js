@@ -599,7 +599,7 @@ const getOrdersOnDate = catchAsync(async (req, res, next) => {
     {
       $match: {
         user: userId,
-        status: { $ne: 'failed' }, // Exclude failed orders
+        status: { $nin: ['failed', 'awaiting-payment'] }, // Exclude failed and awaiting-payment orders
         createdAt: { $gte: startDate, $lt: endDate }, // Match orders on the specific date
       },
     },
