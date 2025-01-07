@@ -199,4 +199,4 @@ const stripeWebhookHandler = async (req, res) => {
 
 module.exports = {
     stripeWebhookHandler
-}; 
+};

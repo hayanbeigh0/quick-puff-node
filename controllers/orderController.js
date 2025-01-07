@@ -731,7 +731,12 @@ const getOrderDates = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
 
   const orderDates = await Order.aggregate([
-    { $match: { user: userId } },
+    {
+      $match: {
+        user: userId,
+        status: { $ne: 'failed' } // Exclude orders with failed status
+      }
+    },
     {
       $group: {
         _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, // Group by date
