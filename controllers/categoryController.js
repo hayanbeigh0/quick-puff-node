@@ -216,51 +216,156 @@ const getBrandsByProductCategory = catchAsync(async (req, res, next) => {
  */
 const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
   const { brandId, productCategoryId } = req.params;
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 10;
 
-  const products = await Product.find({
-    brand: brandId,
-    productCategory: productCategoryId
-  })
-    .select('name image price stock quantity nicotineStrength averageRating flavor hasDeal')
-    .populate('flavor', 'name createdAt updatedAt')
-    .lean()
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .then(products => products.map(product => ({
-      id: product._id,
-      name: product.name,
-      image: product.image,
-      price: product.price,
-      stock: product.stock,
-      quantity: product.quantity,
-      nicotineStrength: product.nicotineStrength || 0,
-      averageRating: product.averageRating || 0,
-      flavor: product.flavor ? {
-        id: product.flavor._id,
-        name: product.flavor.name,
-        createdAt: product.flavor.createdAt,
-        updatedAt: product.flavor.updatedAt
-      } : null,
-      hasDeal: product.hasDeal || false
-    })));
+  // Extract filters from query params
+  const {
+    sortBy,
+    deals,
+    available,
+    flavor,
+    maxQuantityValue,
+    maxQuantityUnit,
+    nicotineStrength,
+    minPrice,
+    maxPrice,
+  } = req.query;
 
-  const totalProducts = await Product.countDocuments({
-    brand: brandId,
-    productCategory: productCategoryId
-  });
+  // Define match filters
+  const matchFilters = {
+    brand: mongoose.Types.ObjectId(brandId),
+    productCategory: mongoose.Types.ObjectId(productCategoryId),
+  };
+
+  // Apply filters based on query parameters
+  if (deals) {
+    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] };
+  }
+
+  if (available) {
+    matchFilters.stock = { $gt: 0 };
+  }
+
+  if (flavor) {
+    matchFilters.flavor = mongoose.Types.ObjectId(flavor);
+  }
+
+  if (maxQuantityValue && maxQuantityUnit) {
+    matchFilters['quantity.value'] = { $lte: parseInt(maxQuantityValue, 10) };
+    matchFilters['quantity.unit'] = maxQuantityUnit.trim();
+  }
+
+  if (nicotineStrength) {
+    matchFilters.nicotineStrength = parseInt(nicotineStrength, 10);
+  }
+
+  if (minPrice || maxPrice) {
+    matchFilters.price = {};
+    if (minPrice) {
+      matchFilters.price.$gte = parseInt(minPrice, 10);
+    }
+    if (maxPrice) {
+      matchFilters.price.$lte = parseInt(maxPrice, 10);
+    }
+  }
+
+  // Define sorting options
+  const sortOptions = {};
+  switch (sortBy) {
+    case 'popularity':
+      sortOptions.popularityScore = -1;
+      break;
+    case 'price-low-to-high':
+      sortOptions.price = 1;
+      break;
+    case 'price-high-to-low':
+      sortOptions.price = -1;
+      break;
+    case 'new-arrivals':
+      sortOptions.createdAt = -1;
+      break;
+    case 'discount':
+      sortOptions.oldPrice = -1;
+      break;
+    default:
+      sortOptions.relevance = -1;
+  }
+
+  const products = await Product.aggregate([
+    {
+      $match: matchFilters,
+    },
+    {
+      $addFields: {
+        popularityScore: {
+          $add: [
+            { $multiply: ['$soldCount', 0.5] },
+            { $multiply: ['$reviewCount', 0.3] },
+            { $multiply: ['$averageRating', 0.2] },
+          ],
+        },
+      },
+    },
+    // Lookup to populate flavor
+    {
+      $lookup: {
+        from: 'flavors', // Name of the flavor collection
+        localField: 'flavor', // Field in Product
+        foreignField: '_id', // Field in Flavor collection
+        as: 'flavorDetails', // Output field
+      },
+    },
+    {
+      $unwind: {
+        path: '$flavorDetails',
+        preserveNullAndEmptyArrays: true, // If no flavor found, it won't throw an error
+      },
+    },
+    {
+      $facet: {
+        products: [
+          { $sort: sortOptions },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $project: {
+              id: '$_id',
+              name: 1,
+              image: 1,
+              price: 1,
+              quantity: 1, // Include quantity object with value and unit
+              stock: 1,
+              nicotineStrength: 1,
+              flavor: {
+                id: '$flavorDetails._id', // Rename _id to id
+                name: '$flavorDetails.name',
+                createdAt: '$flavorDetails.createdAt',
+                updatedAt: '$flavorDetails.updatedAt',
+              },
+              averageRating: 1,
+              hasDeal: { $gt: ['$oldPrice', '$price'] },
+              _id: 0, // Remove _id
+            },
+          },
+        ],
+        totalCount: [{ $count: 'count' }],
+      },
+    },
+  ]);
+
+  const totalCount = products[0].totalCount[0]?.count || 0;
+  const totalPages = Math.ceil(totalCount / limit);
 
   res.status(200).json({
     status: 'success',
-    results: products.length,
-    products,
+    products: products[0].products || [],
     pageInfo: {
       page,
       limit,
-      totalPages: Math.ceil(totalProducts / limit),
-      totalItems: totalProducts
-    }
+      totalPages,
+      totalItems: totalCount,
+    },
   });
 });
 
