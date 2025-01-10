@@ -373,15 +373,62 @@ const getProductsByBrandAndCategory = catchAsync(async (req, res, next) => {
  * Get total products count by brand and category
  */
 const getTotalProductsCountByBrandAndCategory = catchAsync(async (req, res, next) => {
-    const { brandId, productCategoryId } = req.params;
+  const { brandId, productCategoryId } = req.params;
 
-  const totalProducts = await Product.countDocuments({
-    brand: brandId,
-    productCategory: productCategoryId
-  });
+  // Extract filters from query params
+  const {
+    deals,
+    available,
+    flavor,
+    maxQuantityValue,
+    maxQuantityUnit,
+    nicotineStrength,
+    minPrice,
+    maxPrice,
+  } = req.query;
 
-    res.status(200).json({
-      status: 'success',
+  // Define match filters
+  const matchFilters = {
+    brand: mongoose.Types.ObjectId(brandId),
+    productCategory: mongoose.Types.ObjectId(productCategoryId),
+  };
+
+  // Apply filters based on query parameters
+  if (deals) {
+    matchFilters.$expr = { $gt: ['$oldPrice', '$price'] };
+  }
+
+  if (available) {
+    matchFilters.stock = { $gt: 0 };
+  }
+
+  if (flavor) {
+    matchFilters.flavor = mongoose.Types.ObjectId(flavor);
+  }
+
+  if (maxQuantityValue && maxQuantityUnit) {
+    matchFilters['quantity.value'] = { $lte: parseInt(maxQuantityValue, 10) };
+    matchFilters['quantity.unit'] = maxQuantityUnit.trim();
+  }
+
+  if (nicotineStrength) {
+    matchFilters.nicotineStrength = parseInt(nicotineStrength, 10);
+  }
+
+  if (minPrice || maxPrice) {
+    matchFilters.price = {};
+    if (minPrice) {
+      matchFilters.price.$gte = parseInt(minPrice, 10);
+    }
+    if (maxPrice) {
+      matchFilters.price.$lte = parseInt(maxPrice, 10);
+    }
+  }
+
+  const totalProducts = await Product.countDocuments(matchFilters);
+
+  res.status(200).json({
+    status: 'success',
     totalProducts
   });
 });
