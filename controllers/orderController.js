@@ -12,6 +12,8 @@ const geolib = require('geolib');
 const FulfillmentCenter = require('../models/fulfillmentCenterModel');
 const { sendNotification } = require('../notifications');
 const { clearProductRelatedCaches } = require('../utils/cacheManager');
+const { validatePromoCode } = require('./promoCodeController');
+const calculateChargesAndDiscount = require('../utils/calculateCharges');
 
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -93,35 +95,9 @@ const createPaymentIntent = async (amount, currency = 'usd') => {
 
 const createOrder = setTransaction(async (req, res, next, session) => {
   const userId = req.user._id;
+  const promoCode = req.body.promoCode || null;
 
-  // 1. Retrieve user and check their age
-  const user = await User.findById(userId).session(session);
-  if (!user || !user.dateOfBirth) {
-    return next(new AppError('User not found or missing date of birth', 400));
-  }
-
-  // if (!user.idVerified) {
-  //   return next(
-  //     new AppError(
-  //       'User ID not verified!',
-  //       400,
-  //       ErrorCodes.USER_ID_NOT_VERIFIED.code,
-  //     ),
-  //   );
-  // }
-
-  const userAge = calculateAge(user.dateOfBirth);
-  if (userAge < MINIMUM_AGE) {
-    return next(
-      new AppError(
-        `You must be at least ${MINIMUM_AGE} years old to place an order`,
-        403,
-        ErrorCodes.MIN_AGE_RESTRICTION.code,
-      ),
-    );
-  }
-
-  // 2. Retrieve the cart items for the user
+  // Retrieve the cart items for the user
   const cart = await Cart.findOne({ user: userId })
     .populate('items.product')
     .session(session);
@@ -129,25 +105,8 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('Your cart is empty', 400));
   }
 
-  // 3. Calculate the total price of the products in the order
-  let productTotalPrice = 0;
-  cart.items.forEach((item) => {
-    productTotalPrice += item.quantity * item.product.price;
-  });
-
-  const tipAmount = req.body.tipAmount || 0;
-  productTotalPrice += tipAmount;
-
-  if (productTotalPrice < MIN_DELIVERY_AMOUNT) {
-    return next(
-      new AppError(
-        `Minimum order amount for delivery is $${MIN_DELIVERY_AMOUNT}`,
-        400,
-      ),
-    );
-  }
-
-  // 4. Retrieve the user's delivery address
+  // Retrieve the user's delivery address
+  const user = await User.findById(userId).session(session);
   const deliveryAddress = user.deliveryAddressLocations.find(
     (address) => address.default === true,
   );
@@ -156,11 +115,7 @@ const createOrder = setTransaction(async (req, res, next, session) => {
     return next(new AppError('Invalid delivery address', 400));
   }
 
-  const MAX_DISTANCE_KM = 100000;
-
-  console.log(deliveryAddress.coordinates);
-
-  // 5. Find the nearest fulfillment center to the user's delivery address
+  // Find the nearest fulfillment center
   const nearestFulfillmentCenter = await FulfillmentCenter.findOne({
     coordinates: {
       $near: {
@@ -169,91 +124,26 @@ const createOrder = setTransaction(async (req, res, next, session) => {
           coordinates: [
             deliveryAddress.coordinates[1],
             deliveryAddress.coordinates[0],
-          ], // User's delivery coordinates
+          ],
         },
-        $maxDistance: MAX_DISTANCE_KM * 1000, // Convert km to meters
+        $maxDistance: 100000 * 1000,
       },
     },
   }).session(session);
 
-  console.log(nearestFulfillmentCenter);
-
   if (!nearestFulfillmentCenter) {
-    return next(
-      new AppError(
-        'No fulfillment center available nearby',
-        404,
-        ErrorCodes.NO_NEAREST_FULLFILMENT_CENTER_FOUND.code,
-      ),
-    );
+    return next(new AppError('No fulfillment center available nearby', 404));
   }
 
-  // 6. Calculate the distance between the fulfillment center and the user's delivery address
-  const distance = calculateDistance(
-    {
-      latitude: deliveryAddress.coordinates[1],
-      longitude: deliveryAddress.coordinates[0],
-    },
-    {
-      latitude: nearestFulfillmentCenter.coordinates[1],
-      longitude: nearestFulfillmentCenter.coordinates[0],
-    },
-  );
+  // Calculate charges and discount
+  const charges = await calculateChargesAndDiscount(userId, cart, promoCode, deliveryAddress, nearestFulfillmentCenter);
 
-  // 7. Calculate dynamic delivery and service fees based on distance
-  const deliveryFee = DELIVERY_FEE_BASE + distance * 0.5; // Add $0.5 per km
-  const serviceFee = SERVICE_FEE_BASE + (distance > 10 ? 2 : 0); // Add extra $2 if distance is > 10km
-
-  // 8. Estimate delivery time (assumed delivery speed of 40 km/h)
-  const deliverySpeedKmPerHour = 40; // Example: constant speed of 40 km/h
-  const estimatedDeliveryTimeHours = distance / deliverySpeedKmPerHour;
-
-  // Convert hours to minutes
-  const estimatedDeliveryTimeMinutes = Math.ceil(
-    estimatedDeliveryTimeHours * 60,
-  );
-
-  const deliveryTimeRange = formatTimeRange(
-    new Date(),
-    estimatedDeliveryTimeMinutes,
-  );
-
-  // 9. Apply promo code discount (if applicable)
-  const promoCode = req.body.promoCode || null;
-  let discountAmount = 0;
-  if (promoCode) {
-    const promo = await PromoCode.findOne({ code: promoCode });
-
-    if (!promo || promo.expirationDate < Date.now()) {
-      return next(new AppError('Promo code is invalid or expired', 400));
-    }
-
-    if (productTotalPrice < promo.minOrderValue) {
-      return next(
-        new AppError(
-          `Minimum order value to apply this promo code is $${promo.minOrderValue}`,
-          400,
-          ErrorCodes.MIN_ORDER_AMOUNT_RESTRICTION.code,
-        ),
-      );
-    }
-
-    if (promo.discountType === 'percentage') {
-      discountAmount = (productTotalPrice * promo.discountValue) / 100;
-    } else if (promo.discountType === 'flat') {
-      discountAmount = promo.discountValue;
-    }
-
-    productTotalPrice -= discountAmount;
-  }
-
-  // 10. Calculate the final total price including delivery and service fees
-  let totalPrice = productTotalPrice + deliveryFee + serviceFee;
-
+  // Add tip amount to the new amount
+  charges.newAmount = charges.newAmount + req.body.tipAmount || 0;
   // Generate order number
   const orderNumber = await generateUniqueOrderNumber();
 
-  // Create the order without payment intent
+  // Create the order
   const newOrder = await Order.create([
     {
       user: userId,
@@ -267,41 +157,42 @@ const createOrder = setTransaction(async (req, res, next, session) => {
       fromAddress: nearestFulfillmentCenter,
       paymentMethod: req.body.paymentMethod,
       paymentStatus: 'pending',
-      tipAmount: tipAmount,
+      tipAmount: req.body.tipAmount || 0,
       promoCode: promoCode,
-      totalPrice: totalPrice,
-      serviceFee: serviceFee,
-      deliveryFee: deliveryFee,
+      discount: charges.discount,
+      totalPrice: charges.newAmount,
+      serviceFee: charges.serviceFee,
+      deliveryFee: charges.deliveryFee,
       status: 'awaiting-payment',
       statusHistory: [{
         status: 'awaiting-payment',
         changedAt: new Date()
       }],
-      deliveryTimeRange: deliveryTimeRange,
+      deliveryTimeRange: formatTimeRange(new Date(), Math.ceil((charges.distance / 40) * 60)),
     }
   ], { session });
 
-  // 14. Restore the inventory
+  // Restore the inventory
   for (const item of cart.items) {
     await Product.findByIdAndUpdate(item.product._id, {
       $inc: { stock: -item.quantity },
     }).session(session);
   }
 
-  // 15. Clear the cart after order creation
+  // Clear the cart after order creation
   await Cart.findOneAndDelete({ user: userId }).session(session);
 
   // Populate the product details, delivery partner, and from address in the newly created order
   const populatedOrder = await Order.findById(newOrder[0]._id)
-    .populate('items.product') // Populate the product in the items list
-    .populate('deliveryPartner') // Populate the delivery partner
-    .populate('fromAddress') // Populate the from address
+    .populate('items.product')
+    .populate('deliveryPartner')
+    .populate('fromAddress')
     .session(session);
 
   // Send the response with the new order details
   res.status(201).json({
     status: 'success',
-    order: populatedOrder
+    order: populatedOrder,
   });
 
   // After updating product stocks
@@ -467,31 +358,41 @@ const reorder = setTransaction(async (req, res, next, session) => {
     ));
   }
 
-  // 7. Calculate total price
-  let totalPrice = productTotalPrice + deliveryFee + serviceFee;
-
-  // 8. Apply promo code if provided
+  // 7. Apply promo code if provided
   const promoCode = req.body.promoCode || null;
+  let discountAmount = 0;
+  let discountedProperty = '';
+
   if (promoCode) {
-    const promo = await PromoCode.findOne({ code: promoCode });
-    if (!promo || promo.expirationDate < Date.now()) {
-      return next(new AppError('Promo code is invalid or expired', 400));
+    try {
+      await validatePromoCode(promoCode, { total: productTotalPrice, items: newItems }, userId, deliveryAddress);
+
+      const promo = await PromoCode.findOne({ code: promoCode });
+
+      if (promo.discountType === 'percentage') {
+        discountAmount = (productTotalPrice * promo.discountValue) / 100;
+      } else if (promo.discountType === 'flat') {
+        discountAmount = promo.discountValue;
+      }
+
+      // Determine application based on promo code properties
+      if (promo.appliesTo === 'product') {
+        productTotalPrice -= discountAmount;
+        discountedProperty = 'product';
+      } else if (promo.appliesTo === 'service') {
+        serviceFee -= discountAmount;
+        discountedProperty = 'service';
+      } else if (promo.appliesTo === 'delivery') {
+        deliveryFee -= discountAmount;
+        discountedProperty = 'delivery';
+      }
+    } catch (error) {
+      return next(new AppError(error.message, 400));
     }
-
-    if (productTotalPrice < promo.minOrderValue) {
-      return next(new AppError(
-        `Minimum order value to apply this promo code is $${promo.minOrderValue}`,
-        400,
-        ErrorCodes.MIN_ORDER_AMOUNT_RESTRICTION.code
-      ));
-    }
-
-    const discountAmount = promo.discountType === 'percentage'
-      ? (productTotalPrice * promo.discountValue) / 100
-      : promo.discountValue;
-
-    totalPrice -= discountAmount;
   }
+
+  // 8. Calculate total price
+  let totalPrice = productTotalPrice + deliveryFee + serviceFee;
 
   // 9. Generate order number and delivery time range
   const orderNumber = await generateUniqueOrderNumber();
@@ -541,7 +442,9 @@ const reorder = setTransaction(async (req, res, next, session) => {
   // 13. Send response
   res.status(201).json({
     status: 'success',
-    order: populatedOrder
+    order: populatedOrder,
+    discountAmount,
+    discountedProperty,
   });
 });
 
@@ -1082,6 +985,62 @@ const cancelOrderByPaymentIntent = catchAsync(async (req, res, next) => {
   }
 });
 
+const calculateChargesAndDiscountAPI = catchAsync(async (req, res, next) => {
+  const { promoCode } = req.body;
+  const userId = req.user.id;
+
+  // Retrieve the user's cart
+  const cart = await Cart.findOne({ user: userId }).populate('items.product');
+  if (!cart || cart.items.length === 0) {
+    return next(new AppError('Your cart is empty', 400));
+  }
+
+  // Retrieve the user's delivery address
+  const user = await User.findById(userId);
+  const deliveryAddress = user.deliveryAddressLocations.find(
+    (address) => address.default === true
+  );
+
+  if (!deliveryAddress || !deliveryAddress.coordinates) {
+    return next(new AppError('Invalid delivery address', 400));
+  }
+
+  // Find the nearest fulfillment center
+  const nearestFulfillmentCenter = await FulfillmentCenter.findOne({
+    coordinates: {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: [
+            deliveryAddress.coordinates[1],
+            deliveryAddress.coordinates[0],
+          ],
+        },
+        $maxDistance: 100000 * 1000,
+      },
+    },
+  });
+
+  if (!nearestFulfillmentCenter) {
+    return next(new AppError('No fulfillment center available nearby', 404));
+  }
+
+  // Calculate charges and discount using the utility function
+  const charges = await calculateChargesAndDiscount(userId, cart, promoCode, deliveryAddress, nearestFulfillmentCenter);
+
+  res.status(200).json({
+    status: 'success',
+    charges: {
+      productTotal: charges.productTotalPrice,
+      deliveryFee: charges.deliveryFee,
+      serviceFee: charges.serviceFee,
+    },
+    discount: charges.discount,
+    originalAmount: charges.originalAmount,
+    newAmount: charges.newAmount,
+  });
+});
+
 module.exports = {
   createOrder,
   cancelOrder,
@@ -1094,5 +1053,6 @@ module.exports = {
   getAdditionalCharges,
   confirmOrderPayment,
   initiatePayment,
-  cancelOrderByPaymentIntent
+  cancelOrderByPaymentIntent,
+  calculateChargesAndDiscountAPI
 };

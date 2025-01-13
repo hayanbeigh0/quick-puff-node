@@ -99,6 +99,16 @@ const orderSchema = new mongoose.Schema(
       default: 0,
     },
     promoCode: String,
+    discount: {
+      amount: {
+        type: Number,
+        default: 0,
+      },
+      property: {
+        type: String,
+        enum: ['product', 'service', 'delivery'],
+      },
+    },
     totalPrice: {
       type: Number,
       required: true,

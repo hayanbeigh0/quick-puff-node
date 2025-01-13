@@ -10,6 +10,8 @@ router.use(authController.protect);
 
 // Static routes first (these don't expect a dynamic parameter)
 router.route('/additionalCharges').get(orderController.getAdditionalCharges);
+router.route('/additionalChargesAndDiscounts')
+  .post(orderController.calculateChargesAndDiscountAPI);
 router.route('/orderDates').get(orderController.getOrderDates);
 
 // Dynamic routes (these expect a parameter)

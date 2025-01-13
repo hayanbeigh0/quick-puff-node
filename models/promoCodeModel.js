@@ -24,6 +24,24 @@ const promoCodeSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  usageLimit: {
+    type: Number,
+    default: 1, // Default to 1 if not specified
+  },
+  usedBy: [
+    {
+      userId: mongoose.Schema.Types.ObjectId,
+      count: {
+        type: Number,
+        default: 0,
+      },
+    },
+  ],
+  appliesTo: {
+    type: String,
+    enum: ['product', 'service', 'delivery'],
+    required: true,
+  },
 });
 
 const PromoCode = mongoose.model('PromoCode', promoCodeSchema);
