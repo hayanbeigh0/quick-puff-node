@@ -200,7 +200,8 @@ const getBrandsByProductCategory = catchAsync(async (req, res, next) => {
     status: 'success',
     brands: brands.map(brand => ({
       id: brand._id,
-      name: brand.name
+      name: brand.name,
+      image: brand.image
     })),
     pageInfo: {
       page,
