@@ -186,7 +186,7 @@ const getBrandsByProductCategory = catchAsync(async (req, res, next) => {
   const brands = await Brand.find({
     categories: productCategoryId
   })
-    .select('name _id')
+    .select('name image _id')
     .sort({ name: 1 })
     .skip(skip)
     .limit(limit)
