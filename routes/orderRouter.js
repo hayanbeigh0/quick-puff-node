@@ -8,6 +8,9 @@ const router = express.Router();
 // Protect all routes after this middleware
 router.use(authController.protect);
 
+// Admin dashboard metrics
+router.route('/admin/metrics').get(authController.restrictTo('user'), orderController.getAdminDashboardMetrics);
+
 // Static routes first (these don't expect a dynamic parameter)
 router.route('/additionalCharges').get(orderController.getAdditionalCharges);
 router.route('/additionalChargesAndDiscounts')

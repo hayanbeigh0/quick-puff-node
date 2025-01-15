@@ -1017,6 +1017,186 @@ const calculateChargesAndDiscountAPI = catchAsync(async (req, res, next) => {
   });
 });
 
+const getAdminDashboardMetrics = catchAsync(async (req, res, next) => {
+  const { startDate, endDate } = req.query;
+
+  // Default to the last 7 days if no date range is provided
+  const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const end = endDate ? new Date(endDate) : new Date();
+
+  // Set the end date to the end of the day to include all orders of that day
+  end.setHours(23, 59, 59, 999);
+
+  // Calculate the previous period
+  const previousStart = new Date(start);
+  const previousEnd = new Date(end);
+
+  // Calculate the length of the current period in milliseconds
+  const periodLength = end - start;
+
+  // Subtract the period length from the current start and end dates
+  // This shifts the current period back by its own length to create the previous period
+  previousStart.setTime(start.getTime() - periodLength);
+  previousEnd.setTime(end.getTime() - periodLength);
+
+  // Helper function to calculate percentage increase
+  const calculatePercentageIncrease = (current, previous) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  // Use aggregation pipeline to calculate current and previous metrics
+  const [currentMetrics, previousMetrics] = await Promise.all([
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: start,
+            $lte: end,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$totalPrice' },
+          totalOrders: { $sum: 1 },
+          customers: { $addToSet: '$user' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalRevenue: 1,
+          totalOrders: 1,
+          totalCustomers: { $size: '$customers' },
+        },
+      },
+    ]),
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: previousStart,
+            $lte: previousEnd,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$totalPrice' },
+          totalOrders: { $sum: 1 },
+          customers: { $addToSet: '$user' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalRevenue: 1,
+          totalOrders: 1,
+          totalCustomers: { $size: '$customers' },
+        },
+      },
+    ]),
+  ]);
+
+  const current = currentMetrics[0] || { totalRevenue: 0, totalOrders: 0, totalCustomers: 0 };
+  const previous = previousMetrics[0] || { totalRevenue: 0, totalOrders: 0, totalCustomers: 0 };
+
+  // Calculate percentage increases
+  const totalRevenueIncrease = calculatePercentageIncrease(current.totalRevenue, previous.totalRevenue);
+  const totalOrdersIncrease = calculatePercentageIncrease(current.totalOrders, previous.totalOrders);
+  const totalCustomersIncrease = calculatePercentageIncrease(current.totalCustomers, previous.totalCustomers);
+
+  // Calculate sales by fulfillment center for current and previous periods
+  const [storeSales, previousStoreSales] = await Promise.all([
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: start,
+            $lte: end,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$fromAddress', // Group by fulfillment center
+          storeRevenue: { $sum: '$totalPrice' },
+          totalOrders: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: 'fulfillmentcenters',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'storeDetails',
+        },
+      },
+      {
+        $unwind: '$storeDetails',
+      },
+      {
+        $project: {
+          _id: 0,
+          storeId: '$_id',
+          storeName: '$storeDetails.name',
+          storeRevenue: 1,
+          totalOrders: 1,
+        },
+      },
+    ]),
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: previousStart,
+            $lte: previousEnd,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$fromAddress',
+          storeRevenue: { $sum: '$totalPrice' },
+        },
+      },
+    ]),
+  ]);
+
+  // Calculate total store revenue for current and previous periods
+  const totalStoreRevenue = storeSales.reduce((sum, store) => sum + store.storeRevenue, 0);
+  const previousTotalStoreRevenue = previousStoreSales.reduce((sum, store) => sum + store.storeRevenue, 0);
+  const totalStoreRevenueIncrease = calculatePercentageIncrease(totalStoreRevenue, previousTotalStoreRevenue);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      totalRevenue: {
+        count: current.totalRevenue,
+        percentageIncrease: totalRevenueIncrease,
+      },
+      totalOrders: {
+        count: current.totalOrders,
+        percentageIncrease: totalOrdersIncrease,
+      },
+      totalCustomers: {
+        count: current.totalCustomers,
+        percentageIncrease: totalCustomersIncrease,
+      },
+      storeSales: {
+        totalStoreRevenue: {
+          count: totalStoreRevenue,
+          percentageIncrease: totalStoreRevenueIncrease,
+        },
+        details: storeSales,
+      },
+    },
+  });
+});
+
 module.exports = {
   createOrder,
   cancelOrder,
@@ -1030,5 +1210,6 @@ module.exports = {
   confirmOrderPayment,
   initiatePayment,
   cancelOrderByPaymentIntent,
-  calculateChargesAndDiscountAPI
+  calculateChargesAndDiscountAPI,
+  getAdminDashboardMetrics
 };
