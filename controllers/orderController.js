@@ -1197,6 +1197,115 @@ const getAdminDashboardMetrics = catchAsync(async (req, res, next) => {
   });
 });
 
+const getTopSellingProducts = catchAsync(async (req, res, next) => {
+  const { startDate, endDate, page = 1, limit = 10 } = req.query;
+
+  // Convert startDate and endDate to Date objects, or use defaults
+  const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
+  const end = endDate ? new Date(endDate) : new Date();
+
+  // Set the end date to the end of the day to include all orders of that day
+  end.setHours(23, 59, 59, 999);
+
+  const skip = (page - 1) * limit;
+
+  const result = await Order.aggregate([
+    // Match orders within the specified date range
+    {
+      $match: {
+        createdAt: {
+          $gte: start,
+          $lte: end,
+        },
+      },
+    },
+    // Unwind the items array to process each item individually
+    { $unwind: '$items' },
+    // Group by product ID and calculate total quantity
+    {
+      $group: {
+        _id: '$items.product',
+        totalQuantity: { $sum: '$items.quantity' },
+      },
+    },
+    // Lookup to get product details, including price and category
+    {
+      $lookup: {
+        from: 'products',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'productDetails',
+      },
+    },
+    // Unwind the product details array
+    { $unwind: '$productDetails' },
+    // Lookup to get category details if category is stored as an ID
+    {
+      $lookup: {
+        from: 'productcategories', // Ensure this matches the actual collection name
+        localField: 'productDetails.productCategory',
+        foreignField: '_id',
+        as: 'categoryDetails',
+      },
+    },
+    // Unwind the category details array
+    { $unwind: '$categoryDetails' },
+    // Calculate total sales using the product price
+    {
+      $addFields: {
+        totalSales: { $multiply: ['$totalQuantity', '$productDetails.price'] },
+      },
+    },
+    // Sort by total sales in descending order
+    { $sort: { totalSales: -1 } },
+    // Facet to handle pagination and total count
+    {
+      $facet: {
+        metadata: [{ $count: 'totalItems' }],
+        data: [
+          { $skip: skip },
+          { $limit: parseInt(limit) },
+          // Project the required fields
+          {
+            $project: {
+              _id: 0,
+              productId: '$_id', // Include productId
+              image: '$productDetails.image',
+              name: '$productDetails.name',
+              category: '$categoryDetails.name', // Include category name
+              totalSales: 1,
+            },
+          },
+        ],
+      },
+    },
+    // Unwind metadata to get totalItems
+    { $unwind: '$metadata' },
+    // Add totalPages to metadata
+    {
+      $addFields: {
+        'metadata.totalPages': {
+          $ceil: { $divide: ['$metadata.totalItems', parseInt(limit)] },
+        },
+      },
+    },
+  ]);
+
+  const topSellingProducts = result[0].data;
+  const pageInfo = {
+    page: parseInt(page),
+    limit: parseInt(limit),
+    totalItems: result[0].metadata.totalItems,
+    totalPages: result[0].metadata.totalPages,
+  };
+
+  res.status(200).json({
+    status: 'success',
+    data: topSellingProducts,
+    pageInfo,
+  });
+});
+
 module.exports = {
   createOrder,
   cancelOrder,
@@ -1211,5 +1320,6 @@ module.exports = {
   initiatePayment,
   cancelOrderByPaymentIntent,
   calculateChargesAndDiscountAPI,
-  getAdminDashboardMetrics
+  getAdminDashboardMetrics,
+  getTopSellingProducts
 };

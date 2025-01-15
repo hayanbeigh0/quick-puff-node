@@ -24,6 +24,10 @@ router
   .get(orderController.getOrders);
 
 router.route('/myOrders').get(orderController.getOrdersOnDate);
+
+// Top selling products
+router.route('/top-selling-products').get(orderController.getTopSellingProducts);
+
 router.route('/:orderId/reorder').post(orderController.reorder);
 
 router.route('/:orderId').delete(orderController.cancelOrder);
@@ -47,5 +51,6 @@ router.post(
   authController.protect,
   orderController.cancelOrderByPaymentIntent
 );
+
 
 module.exports = router;
